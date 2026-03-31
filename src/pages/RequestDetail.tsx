@@ -46,19 +46,30 @@ export default function RequestDetail() {
   const [request, setRequest] = useState<Request | null>(null)
   const [decision, setDecision] = useState<Decision | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   async function fetchData() {
     if (!id) return
     setLoading(true)
+    setError('')
 
-    const [reqRes, decRes] = await Promise.all([
-      dhub.from('requests').select('*').eq('id', id).single(),
-      dhub.from('decisions').select('*').eq('request_id', id).order('decided_at', { ascending: false }).limit(1),
-    ])
+    try {
+      const reqRes = await dhub.from('requests').select('*').eq('id', id).maybeSingle()
 
-    if (reqRes.data) setRequest(reqRes.data as Request)
-    if (decRes.data && (decRes.data as Decision[]).length > 0) {
-      setDecision((decRes.data as Decision[])[0])
+      if (reqRes.error) {
+        setError(`Failed to load request: ${reqRes.error.message}`)
+        setLoading(false)
+        return
+      }
+
+      if (reqRes.data) setRequest(reqRes.data as Request)
+
+      const decRes = await dhub.from('decisions').select('*').eq('request_id', id).order('decided_at', { ascending: false }).limit(1)
+      if (decRes.data && (decRes.data as Decision[]).length > 0) {
+        setDecision((decRes.data as Decision[])[0])
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unexpected error loading request')
     }
     setLoading(false)
   }
@@ -71,6 +82,18 @@ export default function RequestDetail() {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-nha-blue" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-lg mx-auto text-center py-20">
+        <p className="text-red-600 font-medium mb-2">Error loading request</p>
+        <p className="text-sm text-nha-gray-500 mb-4">{error}</p>
+        <button onClick={() => navigate('/inbox')} className="text-nha-sky hover:underline text-sm">
+          Back to Inbox
+        </button>
       </div>
     )
   }
