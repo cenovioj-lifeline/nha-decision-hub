@@ -83,13 +83,15 @@ export default function RequestDetail() {
 
   const analysis = request.ai_analysis as {
     summary?: string
+    related?: { task_id: string; task_name: string; status: string; assignee?: string | null; similarity: number; relationship?: string }[]
     related_items?: { task_id: string; task_name: string; status: string; assignee_name: string | null; similarity: number }[]
+    duplicate_of?: { task_id: string; task_name: string; status: string; assignee?: string | null } | null
     duplicate_warning?: string
-    category_suggestion?: string
+    category?: string
     priority_suggestion?: string
   } | null
 
-  const relatedItems = analysis?.related_items ?? []
+  const relatedItems = analysis?.related ?? analysis?.related_items ?? []
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -146,9 +148,13 @@ export default function RequestDetail() {
             </div>
 
             {/* Description */}
-            {request.description && (
+            {request.description ? (
               <div className="prose prose-sm max-w-none text-nha-gray-700 whitespace-pre-wrap">
                 {request.description}
+              </div>
+            ) : (
+              <div className="text-sm text-nha-gray-400 italic">
+                No text content — this message may have been an image or attachment only.
               </div>
             )}
 

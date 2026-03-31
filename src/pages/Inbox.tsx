@@ -27,6 +27,7 @@ export default function Inbox() {
       .from('requests')
       .select('*')
       .eq('status', 'inbox')
+      .neq('title', '')
       .order('created_at', { ascending: false })
 
     if (fetchError) {
