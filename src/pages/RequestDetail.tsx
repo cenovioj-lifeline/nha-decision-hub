@@ -120,6 +120,11 @@ export default function RequestDetail() {
   } | null
 
   const relatedItems = analysis?.related ?? analysis?.related_items ?? []
+  // attachments may come back as a JSON string from PostgREST
+  if (request.attachments && typeof request.attachments === 'string') {
+    try { request.attachments = JSON.parse(request.attachments) } catch { request.attachments = null }
+  }
+
   const isEmail = request.source === 'email'
   const emailSubject = request.metadata?.subject_full || request.title
   const emailCc = request.metadata?.cc
