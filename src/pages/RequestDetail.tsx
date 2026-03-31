@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, Paperclip } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Paperclip, Mail, Reply } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { timeAgo, formatDateTime } from '../lib/utils'
 import CategoryIcon from '../components/CategoryIcon'
@@ -24,6 +24,11 @@ interface Request {
   status: string
   created_at: string
   updated_at: string
+  metadata: {
+    cc?: string | null
+    subject_full?: string | null
+    message_id?: string | null
+  } | null
 }
 
 interface Decision {
@@ -92,6 +97,9 @@ export default function RequestDetail() {
   } | null
 
   const relatedItems = analysis?.related ?? analysis?.related_items ?? []
+  const isEmail = request.source === 'email'
+  const emailSubject = request.metadata?.subject_full || request.title
+  const emailCc = request.metadata?.cc
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -132,10 +140,10 @@ export default function RequestDetail() {
             {/* Source info */}
             <div className="flex items-center gap-2 mb-4 text-sm">
               <StatusBadge value={request.source} type="source" />
-              {request.source_channel && (
+              {!isEmail && request.source_channel && (
                 <span className="text-nha-gray-500">#{request.source_channel}</span>
               )}
-              {request.source_ref && (
+              {!isEmail && request.source_ref && (
                 <a
                   href={request.source_ref}
                   target="_blank"
@@ -146,6 +154,29 @@ export default function RequestDetail() {
                 </a>
               )}
             </div>
+
+            {/* Email metadata */}
+            {isEmail && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail size={14} className="text-blue-600 shrink-0" />
+                  <span className="text-nha-gray-500">From:</span>
+                  <span className="text-nha-gray-800 font-medium">
+                    {request.requester_name} &lt;{request.requester_email || request.source_channel}&gt;
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="ml-5 text-nha-gray-500">Subject:</span>
+                  <span className="text-nha-gray-800">{emailSubject}</span>
+                </div>
+                {emailCc && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="ml-5 text-nha-gray-500">CC:</span>
+                    <span className="text-nha-gray-700">{emailCc}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Description */}
             {request.description ? (
@@ -221,6 +252,13 @@ export default function RequestDetail() {
             </div>
           ) : request.status === 'inbox' ? (
             <div className="bg-white rounded-2xl border border-nha-gray-200 p-6">
+              {/* Email reply indicator */}
+              {isEmail && request.requester_email && (
+                <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-700">
+                  <Reply size={14} className="shrink-0" />
+                  Decision reply will be sent to <strong>{request.requester_email}</strong>
+                </div>
+              )}
               <DecisionForm
                 requestId={request.id}
                 relatedItems={relatedItems.map((r) => ({ task_id: r.task_id, task_name: r.task_name }))}

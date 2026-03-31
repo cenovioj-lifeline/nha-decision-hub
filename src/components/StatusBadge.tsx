@@ -16,6 +16,12 @@ const ACTION_STYLES: Record<string, string> = {
   defer: 'bg-nha-gray-100 text-nha-gray-600',
 }
 
+const SOURCE_STYLES: Record<string, string> = {
+  slack: 'bg-purple-100 text-purple-700',
+  email: 'bg-blue-100 text-blue-700',
+  screenshot: 'bg-nha-orange-light text-nha-orange',
+}
+
 interface StatusBadgeProps {
   value: string
   type?: 'status' | 'action' | 'source'
@@ -23,7 +29,11 @@ interface StatusBadgeProps {
 }
 
 export default function StatusBadge({ value, type = 'status', className }: StatusBadgeProps) {
-  const styles = type === 'action' ? ACTION_STYLES : STATUS_STYLES
+  const styles = type === 'action'
+    ? ACTION_STYLES
+    : type === 'source'
+      ? SOURCE_STYLES
+      : STATUS_STYLES
   const style = styles[value] ?? 'bg-nha-gray-100 text-nha-gray-600'
 
   return (

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Clock } from 'lucide-react'
+import { Clock, Mail, MessageSquare } from 'lucide-react'
 import CategoryIcon from './CategoryIcon'
 import StatusBadge from './StatusBadge'
 import { timeAgo } from '../lib/utils'
@@ -20,9 +20,15 @@ interface RequestCardProps {
   request: Request
 }
 
+const SOURCE_ICONS: Record<string, typeof Mail> = {
+  email: Mail,
+  slack: MessageSquare,
+}
+
 export default function RequestCard({ request }: RequestCardProps) {
   const navigate = useNavigate()
   const analysis = request.ai_analysis as { summary?: string } | null
+  const SourceIcon = SOURCE_ICONS[request.source]
 
   return (
     <button
@@ -40,7 +46,10 @@ export default function RequestCard({ request }: RequestCardProps) {
           <div className="flex items-center gap-2 text-sm text-nha-gray-500 mb-2">
             <span>{request.requester_name}</span>
             <span className="text-nha-gray-300">|</span>
-            <StatusBadge value={request.source} type="source" />
+            <span className="flex items-center gap-1">
+              {SourceIcon && <SourceIcon size={12} />}
+              <StatusBadge value={request.source} type="source" />
+            </span>
             <span className="text-nha-gray-300">|</span>
             <span className="flex items-center gap-1">
               <Clock size={12} />
