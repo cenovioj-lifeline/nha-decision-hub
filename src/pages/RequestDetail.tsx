@@ -38,6 +38,9 @@ interface Decision {
   priority: string | null
   clickup_task_url: string | null
   decided_at: string
+  sprint_id: string | null
+  cenovio_estimate: number | null
+  sprints: { label: string } | { label: string }[] | null
 }
 
 export default function RequestDetail() {
@@ -64,7 +67,7 @@ export default function RequestDetail() {
 
       if (reqRes.data) setRequest(reqRes.data as Request)
 
-      const decRes = await dhub.from('decisions').select('*').eq('request_id', id).order('decided_at', { ascending: false }).limit(1)
+      const decRes = await dhub.from('decisions').select('*, sprints(label)').eq('request_id', id).order('decided_at', { ascending: false }).limit(1)
       if (decRes.data && (decRes.data as Decision[]).length > 0) {
         setDecision((decRes.data as Decision[])[0])
       }
@@ -257,10 +260,21 @@ export default function RequestDetail() {
           {decision ? (
             <div className="bg-white rounded-2xl border border-nha-gray-200 p-6">
               <h3 className="font-semibold text-nha-gray-800 mb-3">Decision</h3>
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-3 mb-3 flex-wrap">
                 <StatusBadge value={decision.action} type="action" />
                 {decision.priority && (
                   <span className="text-sm text-nha-gray-500">Priority: {decision.priority}</span>
+                )}
+                {(() => {
+                  const sprint = Array.isArray(decision.sprints) ? decision.sprints[0] : decision.sprints
+                  return sprint ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-nha-sky-light text-nha-sky border border-nha-sky/20">
+                      Sprint {sprint.label}
+                    </span>
+                  ) : null
+                })()}
+                {decision.cenovio_estimate != null && (
+                  <span className="text-sm text-nha-gray-500">{decision.cenovio_estimate}h estimate</span>
                 )}
                 <span className="text-sm text-nha-gray-400">{formatDateTime(decision.decided_at)}</span>
               </div>

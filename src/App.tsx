@@ -10,6 +10,8 @@ import Upload from './pages/Upload'
 import MyRequests from './pages/MyRequests'
 import DecisionsLog from './pages/DecisionsLog'
 import Tracking from './pages/Tracking'
+import Sprints from './pages/Sprints'
+import Declined from './pages/Declined'
 import Dashboard from './pages/Dashboard'
 
 function RootRedirect() {
@@ -46,6 +48,8 @@ export default function App() {
             <Route path="/requests/:id" element={<ProtectedRoute adminOnly><RequestDetail /></ProtectedRoute>} />
             <Route path="/upload" element={<ProtectedRoute adminOnly><Upload /></ProtectedRoute>} />
             <Route path="/decisions" element={<ProtectedRoute adminOnly><DecisionsLog /></ProtectedRoute>} />
+            <Route path="/sprints" element={<ProtectedRoute adminOnly><Sprints /></ProtectedRoute>} />
+            <Route path="/declined" element={<ProtectedRoute adminOnly><Declined /></ProtectedRoute>} />
             <Route path="/tracking" element={<ProtectedRoute adminOnly><Tracking /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
             <Route path="/my-requests" element={<MyRequests />} />

@@ -11,6 +11,8 @@ import {
   Menu,
   X,
   Bell,
+  Calendar,
+  XCircle,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { cn } from '../lib/utils'
@@ -26,6 +28,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/inbox', label: 'Inbox', icon: Inbox, adminOnly: true },
   { to: '/upload', label: 'Upload', icon: Upload, adminOnly: true },
   { to: '/decisions', label: 'Decisions', icon: CheckSquare, adminOnly: true },
+  { to: '/sprints', label: 'Sprints', icon: Calendar, adminOnly: true },
+  { to: '/declined', label: 'Declined', icon: XCircle, adminOnly: true },
   { to: '/tracking', label: 'Tracking', icon: BarChart3, adminOnly: true },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
   { to: '/my-requests', label: 'My Requests', icon: FileText },

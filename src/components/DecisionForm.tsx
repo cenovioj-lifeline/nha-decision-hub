@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Check, X, GitMerge, MessageSquare, Clock } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { dhub } from '../lib/supabase'
@@ -9,6 +9,12 @@ type Action = 'approve' | 'decline' | 'merge' | 'discuss' | 'defer'
 interface RelatedItem {
   task_id: string
   task_name: string
+}
+
+interface Sprint {
+  id: string
+  label: string
+  status: string
 }
 
 interface DecisionFormProps {
@@ -34,8 +40,23 @@ export default function DecisionForm({ requestId, relatedItems, onDecided }: Dec
   const [priority, setPriority] = useState('normal')
   const [mergedWithTaskId, setMergedWithTaskId] = useState('')
   const [discussWith, setDiscussWith] = useState('')
+  const [sprintId, setSprintId] = useState('')
+  const [cenovioEstimate, setCenovioEstimate] = useState('')
+  const [sprints, setSprints] = useState<Sprint[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function fetchSprints() {
+      const { data } = await dhub
+        .from('sprints')
+        .select('id, label, status')
+        .in('status', ['active', 'planned'])
+        .order('start_date', { ascending: true })
+      if (data) setSprints(data as Sprint[])
+    }
+    fetchSprints()
+  }, [])
 
   async function handleSubmit() {
     if (!action) return
@@ -54,6 +75,8 @@ export default function DecisionForm({ requestId, relatedItems, onDecided }: Dec
 
       if (action === 'approve') {
         decision.priority = priority
+        if (sprintId) decision.sprint_id = sprintId
+        if (cenovioEstimate) decision.cenovio_estimate = parseFloat(cenovioEstimate)
       }
       if (action === 'merge' && mergedWithTaskId) {
         decision.merged_with_task_id = mergedWithTaskId
@@ -104,23 +127,55 @@ export default function DecisionForm({ requestId, relatedItems, onDecided }: Dec
       </div>
 
       {action === 'approve' && (
-        <div>
-          <label className="block text-sm font-medium text-nha-gray-700 mb-1">Priority</label>
-          <div className="flex gap-2">
-            {PRIORITIES.map((p) => (
-              <button
-                key={p}
-                onClick={() => setPriority(p)}
-                className={cn(
-                  'px-3 py-1.5 rounded-lg border text-sm capitalize transition-all',
-                  priority === p
-                    ? 'bg-nha-blue text-white border-nha-blue'
-                    : 'border-nha-gray-200 hover:border-nha-gray-300 bg-white',
-                )}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-nha-gray-700 mb-1">Priority</label>
+            <div className="flex gap-2">
+              {PRIORITIES.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPriority(p)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg border text-sm capitalize transition-all',
+                    priority === p
+                      ? 'bg-nha-blue text-white border-nha-blue'
+                      : 'border-nha-gray-200 hover:border-nha-gray-300 bg-white',
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-nha-gray-700 mb-1">Sprint</label>
+              <select
+                value={sprintId}
+                onChange={(e) => setSprintId(e.target.value)}
+                className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nha-sky focus:border-nha-sky"
               >
-                {p}
-              </button>
-            ))}
+                <option value="">Unassigned</option>
+                {sprints.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}{s.status === 'active' ? ' (active)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="w-32">
+              <label className="block text-sm font-medium text-nha-gray-700 mb-1">Estimate (hrs)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={cenovioEstimate}
+                onChange={(e) => setCenovioEstimate(e.target.value)}
+                placeholder="0"
+                className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nha-sky focus:border-nha-sky"
+              />
+            </div>
           </div>
         </div>
       )}
