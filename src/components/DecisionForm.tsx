@@ -102,18 +102,26 @@ export default function DecisionForm({ requestId, currentStatus, onDecided }: De
         .single()
       if (insertError) throw insertError
 
-      // Fire-and-forget: trigger ClickUp task creation for approvals
+      // Fire-and-forget: trigger ClickUp task creation for approvals (if enabled)
       if (action === 'approve' && insertedDecision?.id) {
-        const { data: { session } } = await supabase.auth.getSession()
-        fetch(EXECUTE_FUNCTION_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token ?? ''}`,
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5od2Rnc3RqaHVnZXpocWxrdGllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTUzMjMsImV4cCI6MjA2ODc3MTMyM30.dsN6HiFYtM1MXxOcyaI-O7vbJxN-si1V3Eth0oIY2JE',
-          },
-          body: JSON.stringify({ decision_id: insertedDecision.id }),
-        }).catch((err) => console.error('ClickUp execution failed:', err))
+        const { data: setting } = await dhub
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'clickup_integration')
+          .single()
+        const clickupEnabled = (setting?.value as { enabled?: boolean })?.enabled === true
+        if (clickupEnabled) {
+          const { data: { session } } = await supabase.auth.getSession()
+          fetch(EXECUTE_FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token ?? ''}`,
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5od2Rnc3RqaHVnZXpocWxrdGllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTUzMjMsImV4cCI6MjA2ODc3MTMyM30.dsN6HiFYtM1MXxOcyaI-O7vbJxN-si1V3Eth0oIY2JE',
+            },
+            body: JSON.stringify({ decision_id: insertedDecision.id }),
+          }).catch((err) => console.error('ClickUp execution failed:', err))
+        }
       }
 
       const statusMap: Record<Action, string> = {

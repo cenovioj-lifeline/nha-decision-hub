@@ -9,6 +9,7 @@ import RequestDetail from './pages/RequestDetail'
 import RequestsAndDecisions from './pages/MyRequests'
 import Sprints from './pages/Sprints'
 import Dashboard from './pages/Dashboard'
+import Admin from './pages/Admin'
 
 function RootRedirect() {
   const { user, isAdmin, isViewer, loading } = useAuth()
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/requests/:id" element={<RequestDetail />} />
             <Route path="/sprints" element={<ProtectedRoute adminOnly><Sprints /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
             <Route path="/requests" element={<RequestsAndDecisions />} />
             {/* Legacy redirects */}
             <Route path="/my-requests" element={<Navigate to="/requests" replace />} />
