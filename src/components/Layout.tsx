@@ -32,7 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/declined', label: 'Declined', icon: XCircle, adminOnly: true },
   { to: '/tracking', label: 'Tracking', icon: BarChart3, adminOnly: true },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
-  { to: '/my-requests', label: 'My Requests', icon: FileText },
+  { to: '/my-requests', label: 'Requests', icon: FileText },
 ]
 
 export default function Layout() {

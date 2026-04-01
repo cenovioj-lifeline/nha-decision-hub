@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { FileText, ExternalLink } from 'lucide-react'
+import { FileText, ExternalLink, ChevronDown } from 'lucide-react'
 import { dhub } from '../lib/supabase'
-import { useAuth } from '../lib/auth'
 import { formatDate } from '../lib/utils'
 import StatusBadge from '../components/StatusBadge'
 import CategoryIcon from '../components/CategoryIcon'
@@ -11,6 +10,8 @@ interface Request {
   title: string
   category: string
   status: string
+  requester_name: string
+  requester_email: string
   created_at: string
   decisions: {
     action: string
@@ -19,25 +20,46 @@ interface Request {
   }[]
 }
 
+interface PersonOption {
+  name: string
+  email: string
+}
+
 export default function MyRequests() {
-  const { user } = useAuth()
   const [requests, setRequests] = useState<Request[]>([])
+  const [people, setPeople] = useState<PersonOption[]>([])
+  const [selectedPerson, setSelectedPerson] = useState<string>('all')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function fetch() {
-      if (!user?.email) return
+    async function fetchAll() {
       const { data } = await dhub
         .from('requests')
-        .select('id, title, category, status, created_at, decisions(action, rationale, clickup_task_url)')
-        .eq('requester_email', user.email)
+        .select('id, title, category, status, requester_name, requester_email, created_at, decisions(action, rationale, clickup_task_url)')
         .order('created_at', { ascending: false })
 
-      setRequests((data as Request[]) ?? [])
+      const all = (data as Request[]) ?? []
+      setRequests(all)
+
+      // Build unique person list from data
+      const seen = new Map<string, string>()
+      for (const r of all) {
+        if (r.requester_email && !seen.has(r.requester_email)) {
+          seen.set(r.requester_email, r.requester_name || r.requester_email)
+        }
+      }
+      const sorted = Array.from(seen.entries())
+        .map(([email, name]) => ({ email, name }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+      setPeople(sorted)
       setLoading(false)
     }
-    fetch()
-  }, [user?.email])
+    fetchAll()
+  }, [])
+
+  const filtered = selectedPerson === 'all'
+    ? requests
+    : requests.filter(r => r.requester_email === selectedPerson)
 
   if (loading) {
     return (
@@ -49,20 +71,39 @@ export default function MyRequests() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-nha-gray-900 mb-1">My Requests</h1>
-      <p className="text-sm text-nha-gray-500 mb-6">
-        Track the status of your submitted requests
-      </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-nha-gray-900">Requests</h1>
+          <p className="text-sm text-nha-gray-500 mt-1">
+            {filtered.length} request{filtered.length !== 1 ? 's' : ''}{selectedPerson !== 'all' ? ` from ${people.find(p => p.email === selectedPerson)?.name}` : ''}
+          </p>
+        </div>
+        <div className="relative">
+          <select
+            value={selectedPerson}
+            onChange={e => setSelectedPerson(e.target.value)}
+            className="appearance-none bg-white border border-nha-gray-200 rounded-lg px-4 py-2 pr-9 text-sm font-medium text-nha-gray-700 cursor-pointer hover:border-nha-gray-300 focus:outline-none focus:ring-2 focus:ring-nha-blue/20 focus:border-nha-blue"
+          >
+            <option value="all">All People</option>
+            {people.map(p => (
+              <option key={p.email} value={p.email}>{p.name}</option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-nha-gray-400 pointer-events-none" />
+        </div>
+      </div>
 
-      {requests.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-nha-gray-400">
           <FileText size={48} className="mb-3" />
-          <p className="text-lg font-medium text-nha-gray-600">No requests yet</p>
-          <p className="text-sm mt-1">Requests submitted by you will appear here</p>
+          <p className="text-lg font-medium text-nha-gray-600">No requests found</p>
+          <p className="text-sm mt-1">
+            {selectedPerson !== 'all' ? 'No requests from this person' : 'No requests have been submitted yet'}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {requests.map((req) => {
+          {filtered.map((req) => {
             const decision = req.decisions?.[0]
             return (
               <div
@@ -76,7 +117,9 @@ export default function MyRequests() {
                       <h3 className="font-semibold text-nha-gray-900">{req.title}</h3>
                       <StatusBadge value={req.status} />
                     </div>
-                    <p className="text-sm text-nha-gray-500">{formatDate(req.created_at)}</p>
+                    <p className="text-sm text-nha-gray-500">
+                      {req.requester_name} &middot; {formatDate(req.created_at)}
+                    </p>
 
                     {decision && (
                       <div className="mt-3 bg-nha-gray-50 rounded-lg p-3">
