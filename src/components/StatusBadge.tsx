@@ -8,6 +8,7 @@ const STATUS_STYLES: Record<string, string> = {
   tracking: 'bg-nha-orange-light text-nha-orange',
   completed: 'bg-green-100 text-green-700',
   consolidated: 'bg-nha-gray-100 text-nha-gray-600',
+  merged: 'bg-purple-100 text-purple-700',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -18,12 +19,14 @@ const STATUS_LABELS: Record<string, string> = {
   tracking: 'In Progress',
   completed: 'Completed',
   consolidated: 'Consolidated',
+  merged: 'Merged',
 }
 
 const ACTION_STYLES: Record<string, string> = {
   approve: 'bg-green-100 text-green-700',
   decline: 'bg-red-100 text-red-700',
   on_hold: 'bg-amber-100 text-amber-700',
+  merge: 'bg-purple-100 text-purple-700',
 }
 
 const SOURCE_STYLES: Record<string, string> = {

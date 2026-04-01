@@ -103,11 +103,76 @@ export default function DecisionForm({ requestId, currentStatus, onDecided }: De
         merge: 'merged',
       }
 
+      // Update the current request's status
+      const updatePayload: Record<string, unknown> = { status: statusMap[action], updated_at: now }
+      if (action === 'merge' && mergeTargetId) {
+        updatePayload.consolidated_into = mergeTargetId
+      }
+
       const { error: updateError } = await dhub
         .from('requests')
-        .update({ status: statusMap[action], updated_at: now })
+        .update(updatePayload)
         .eq('id', requestId)
       if (updateError) throw updateError
+
+      // Merge execution: absorb this request's content into the target
+      if (action === 'merge' && mergeTargetId) {
+        // Fetch both requests to combine content
+        const [sourceRes, targetRes] = await Promise.all([
+          dhub.from('requests').select('*').eq('id', requestId).single(),
+          dhub.from('requests').select('*').eq('id', mergeTargetId).single(),
+        ])
+
+        if (sourceRes.data && targetRes.data) {
+          const source = sourceRes.data as Record<string, unknown>
+          const target = targetRes.data as Record<string, unknown>
+
+          // Build merged source_messages array
+          const targetMeta = (target.metadata || {}) as Record<string, unknown>
+          const sourceMeta = (source.metadata || {}) as Record<string, unknown>
+          const existingMessages = (targetMeta.source_messages || []) as unknown[]
+          const sourceMessages = (sourceMeta.source_messages || []) as unknown[]
+
+          // If source doesn't have source_messages, create one from its description
+          const sourceEntry = sourceMessages.length > 0 ? sourceMessages : [{
+            id: source.id,
+            author: source.requester_name || 'Unknown',
+            source: source.source || 'manual',
+            date: source.created_at,
+            original_text: source.description || source.title || '',
+            has_attachment: Array.isArray(source.attachments) && (source.attachments as unknown[]).length > 0,
+          }]
+
+          const mergedMessages = [...existingMessages, ...sourceEntry]
+
+          // Merge attachments
+          const targetAttachments = Array.isArray(target.attachments) ? target.attachments as unknown[] : []
+          const sourceAttachments = Array.isArray(source.attachments) ? source.attachments as unknown[] : []
+          const mergedAttachments = [...targetAttachments, ...sourceAttachments]
+
+          // Append to description
+          const targetDesc = (target.description || '') as string
+          const sourceDesc = (source.description || '') as string
+          const mergedDesc = sourceDesc
+            ? `${targetDesc}\n\n--- Merged from: ${source.title} (${source.requester_name}) ---\n${sourceDesc}`
+            : targetDesc
+
+          // Update target with merged content
+          const mergedMeta = {
+            ...targetMeta,
+            is_consolidated: true,
+            source_count: mergedMessages.length,
+            source_messages: mergedMessages,
+          }
+
+          await dhub.from('requests').update({
+            description: mergedDesc,
+            attachments: mergedAttachments.length > 0 ? mergedAttachments : null,
+            metadata: mergedMeta,
+            updated_at: now,
+          }).eq('id', mergeTargetId)
+        }
+      }
 
       onDecided()
     } catch (err) {

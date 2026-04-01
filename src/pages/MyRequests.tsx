@@ -39,6 +39,7 @@ function getOutcome(req: Request): { label: string; type: OutcomeFilter } {
     case 'approve': return { label: 'Approved', type: 'approved' }
     case 'decline': return { label: 'Declined', type: 'declined' }
     case 'on_hold': return { label: 'On Hold', type: 'pending' }
+    case 'merge': return { label: 'Merged', type: 'other' }
     default: return { label: decision.action, type: 'other' }
   }
 }
