@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Clock, ExternalLink, Layers, Mail, MessageSquare, Paperclip, Reply } from 'lucide-react'
+import { ArrowLeft, Clock, ExternalLink, Image, Layers, Mail, MessageSquare, Paperclip, Reply, X } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { timeAgo, formatDateTime } from '../lib/utils'
 import CategoryIcon from '../components/CategoryIcon'
@@ -62,6 +62,7 @@ export default function RequestDetail() {
   const [decision, setDecision] = useState<Decision | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   async function fetchData() {
     if (!id) return
@@ -242,26 +243,28 @@ export default function RequestDetail() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {request.attachments.map((att, i) => {
                     const isSlackPrivate = att.url?.includes('files.slack.com/files-pri')
+                    const isImage = att.type?.startsWith('image/')
                     return (
                     <div key={i}>
-                      {att.type?.startsWith('image/') && !isSlackPrivate ? (
-                        <a href={att.url} target="_blank" rel="noopener noreferrer">
+                      {isImage && !isSlackPrivate ? (
+                        <button
+                          onClick={() => setLightboxUrl(att.url)}
+                          className="w-full text-left"
+                        >
                           <img
                             src={att.url}
                             alt={att.name}
-                            className="rounded-lg border border-nha-gray-200 w-full object-cover max-h-64"
+                            className="rounded-lg border border-nha-gray-200 w-full object-cover max-h-64 hover:opacity-90 transition-opacity cursor-pointer"
                           />
-                        </a>
+                        </button>
                       ) : (
-                        <a
-                          href={att.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 bg-nha-gray-50 rounded-lg border border-nha-gray-200 p-3 hover:bg-nha-gray-100 transition-colors"
+                        <button
+                          onClick={() => setLightboxUrl(att.url)}
+                          className="w-full flex items-center gap-2 bg-nha-gray-50 rounded-lg border border-nha-gray-200 p-3 hover:bg-nha-gray-100 transition-colors"
                         >
-                          <Paperclip size={14} className="text-nha-gray-400" />
-                          <span className="text-sm text-nha-gray-700 truncate">{att.name}</span>
-                        </a>
+                          {isImage ? <Image size={14} className="text-nha-gray-400" /> : <Paperclip size={14} className="text-nha-gray-400" />}
+                          <span className="text-sm text-nha-gray-700 truncate">{att.name || 'Attachment'}</span>
+                        </button>
                       )}
                     </div>
                     )
@@ -417,6 +420,27 @@ export default function RequestDetail() {
           </div>
         </div>
       </div>
+
+      {/* Lightbox modal */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-8"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors"
+          >
+            <X size={28} />
+          </button>
+          <iframe
+            src={lightboxUrl}
+            className="max-w-full max-h-full w-full h-full rounded-lg bg-white"
+            title="Attachment preview"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   )
 }
