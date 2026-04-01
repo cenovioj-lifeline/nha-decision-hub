@@ -1,9 +1,16 @@
-import { useEffect, useState } from 'react'
-import { FileText, ExternalLink, ChevronDown } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { FileText, ExternalLink, ChevronDown, Clock, CheckCircle, XCircle, ArrowRight } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { formatDate } from '../lib/utils'
-import StatusBadge from '../components/StatusBadge'
-import CategoryIcon from '../components/CategoryIcon'
+
+interface Decision {
+  action: string
+  rationale: string | null
+  clickup_task_url: string | null
+  decided_at: string | null
+  priority: string | null
+  sprints: { label: string }[] | null
+}
 
 interface Request {
   id: string
@@ -13,16 +20,53 @@ interface Request {
   requester_name: string
   requester_email: string
   created_at: string
-  decisions: {
-    action: string
-    rationale: string | null
-    clickup_task_url: string | null
-  }[]
+  decisions: Decision[]
 }
 
 interface PersonOption {
   name: string
   email: string
+}
+
+function getOutcome(req: Request): { label: string; type: 'pending' | 'approved' | 'declined' | 'other' } {
+  const decision = req.decisions?.[0]
+  if (!decision) return { label: 'Pending review', type: 'pending' }
+  switch (decision.action) {
+    case 'approve': return { label: 'Approved', type: 'approved' }
+    case 'decline': return { label: 'Declined', type: 'declined' }
+    case 'defer': return { label: 'Deferred', type: 'other' }
+    case 'merge': return { label: 'Merged', type: 'other' }
+    case 'discuss': return { label: 'Under discussion', type: 'pending' }
+    default: return { label: decision.action, type: 'other' }
+  }
+}
+
+function daysSince(dateStr: string): number {
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
+}
+
+function OutcomeBadge({ type, label }: { type: string; label: string }) {
+  const styles: Record<string, string> = {
+    pending: 'bg-amber-50 text-amber-700 border-amber-200',
+    approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    declined: 'bg-nha-gray-100 text-nha-gray-600 border-nha-gray-200',
+    other: 'bg-nha-gray-50 text-nha-gray-500 border-nha-gray-200',
+  }
+  const icons: Record<string, typeof Clock> = {
+    pending: Clock,
+    approved: CheckCircle,
+    declined: XCircle,
+    other: ArrowRight,
+  }
+  const Icon = icons[type] || ArrowRight
+  const style = styles[type] || styles.other
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${style}`}>
+      <Icon size={12} />
+      {label}
+    </span>
+  )
 }
 
 export default function MyRequests() {
@@ -35,23 +79,23 @@ export default function MyRequests() {
     async function fetchAll() {
       const { data } = await dhub
         .from('requests')
-        .select('id, title, category, status, requester_name, requester_email, created_at, decisions(action, rationale, clickup_task_url)')
+        .select('id, title, category, status, requester_name, requester_email, created_at, decisions(action, rationale, clickup_task_url, decided_at, priority, sprints(label))')
         .order('created_at', { ascending: false })
 
       const all = (data as Request[]) ?? []
       setRequests(all)
 
-      // Build unique person list from data
       const seen = new Map<string, string>()
       for (const r of all) {
         if (r.requester_email && !seen.has(r.requester_email)) {
           seen.set(r.requester_email, r.requester_name || r.requester_email)
         }
       }
-      const sorted = Array.from(seen.entries())
-        .map(([email, name]) => ({ email, name }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-      setPeople(sorted)
+      setPeople(
+        Array.from(seen.entries())
+          .map(([email, name]) => ({ email, name }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      )
       setLoading(false)
     }
     fetchAll()
@@ -60,6 +104,18 @@ export default function MyRequests() {
   const filtered = selectedPerson === 'all'
     ? requests
     : requests.filter(r => r.requester_email === selectedPerson)
+
+  // Group: pending first, then resolved
+  const { pending, resolved } = useMemo(() => {
+    const p: Request[] = []
+    const r: Request[] = []
+    for (const req of filtered) {
+      const outcome = getOutcome(req)
+      if (outcome.type === 'pending') p.push(req)
+      else r.push(req)
+    }
+    return { pending: p, resolved: r }
+  }, [filtered])
 
   if (loading) {
     return (
@@ -75,7 +131,8 @@ export default function MyRequests() {
         <div>
           <h1 className="text-2xl font-bold text-nha-gray-900">Requests</h1>
           <p className="text-sm text-nha-gray-500 mt-1">
-            {filtered.length} request{filtered.length !== 1 ? 's' : ''}{selectedPerson !== 'all' ? ` from ${people.find(p => p.email === selectedPerson)?.name}` : ''}
+            {filtered.length} request{filtered.length !== 1 ? 's' : ''}
+            {pending.length > 0 && ` · ${pending.length} awaiting review`}
           </p>
         </div>
         <div className="relative">
@@ -102,50 +159,99 @@ export default function MyRequests() {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((req) => {
-            const decision = req.decisions?.[0]
-            return (
-              <div
-                key={req.id}
-                className="bg-white rounded-xl border border-nha-gray-200 p-4"
-              >
-                <div className="flex items-start gap-3">
-                  <CategoryIcon category={req.category} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h3 className="font-semibold text-nha-gray-900">{req.title}</h3>
-                      <StatusBadge value={req.status} />
-                    </div>
-                    <p className="text-sm text-nha-gray-500">
-                      {req.requester_name} &middot; {formatDate(req.created_at)}
-                    </p>
-
-                    {decision && (
-                      <div className="mt-3 bg-nha-gray-50 rounded-lg p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <StatusBadge value={decision.action} type="action" />
-                        </div>
-                        {decision.rationale && (
-                          <p className="text-sm text-nha-gray-600 mt-1">{decision.rationale}</p>
-                        )}
-                        {decision.action === 'approve' && decision.clickup_task_url && (
-                          <a
-                            href={decision.clickup_task_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm text-nha-sky hover:underline mt-2"
-                          >
-                            Track in ClickUp <ExternalLink size={12} />
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+        <div className="space-y-8">
+          {/* Pending section */}
+          {pending.length > 0 && (
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-amber-600 mb-3">
+                Awaiting Review ({pending.length})
+              </h2>
+              <div className="space-y-2">
+                {pending.map(req => <RequestCard key={req.id} request={req} />)}
               </div>
-            )
-          })}
+            </div>
+          )}
+
+          {/* Resolved section */}
+          {resolved.length > 0 && (
+            <div>
+              {pending.length > 0 && (
+                <h2 className="text-xs font-bold uppercase tracking-wider text-nha-gray-400 mb-3">
+                  Resolved ({resolved.length})
+                </h2>
+              )}
+              <div className="space-y-2">
+                {resolved.map(req => <RequestCard key={req.id} request={req} />)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RequestCard({ request: req }: { request: Request }) {
+  const decision = req.decisions?.[0]
+  const outcome = getOutcome(req)
+  const waiting = daysSince(req.created_at)
+
+  return (
+    <div className="bg-white rounded-xl border border-nha-gray-200 px-5 py-4">
+      {/* Row 1: Title + outcome badge */}
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <h3 className="font-semibold text-nha-gray-900 text-[15px] leading-snug">{req.title}</h3>
+        <OutcomeBadge type={outcome.type} label={outcome.label} />
+      </div>
+
+      {/* Row 2: Meta line */}
+      <div className="flex items-center gap-1.5 text-xs text-nha-gray-400 mb-1">
+        <span>{req.requester_name}</span>
+        <span>·</span>
+        <span className="capitalize">{req.category}</span>
+        <span>·</span>
+        <span>Submitted {formatDate(req.created_at)}</span>
+        {outcome.type === 'pending' && waiting >= 2 && (
+          <>
+            <span>·</span>
+            <span className="text-amber-600 font-medium">{waiting}d ago</span>
+          </>
+        )}
+      </div>
+
+      {/* Row 3: Decision details (only if decided) */}
+      {decision && (
+        <div className="mt-3 pt-3 border-t border-nha-gray-100">
+          <div className="flex items-center gap-1.5 text-xs text-nha-gray-400 mb-1">
+            <span>Responded {decision.decided_at ? formatDate(decision.decided_at) : ''}</span>
+            {decision.action === 'approve' && decision.priority && (
+              <>
+                <span>·</span>
+                <span className="capitalize">{decision.priority} priority</span>
+              </>
+            )}
+            {decision.action === 'approve' && decision.sprints?.[0]?.label && (
+              <>
+                <span>·</span>
+                <span>Sprint {decision.sprints![0].label}</span>
+              </>
+            )}
+          </div>
+
+          {decision.rationale && (
+            <p className="text-sm text-nha-gray-600 leading-relaxed mt-1">{decision.rationale}</p>
+          )}
+
+          {decision.action === 'approve' && decision.clickup_task_url && (
+            <a
+              href={decision.clickup_task_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-nha-sky hover:underline mt-2"
+            >
+              Track in ClickUp <ExternalLink size={11} />
+            </a>
+          )}
         </div>
       )}
     </div>
