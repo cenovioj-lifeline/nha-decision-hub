@@ -28,7 +28,7 @@ export default function Inbox() {
     const { data, error: fetchError } = await dhub
       .from('requests')
       .select('*')
-      .eq('status', 'inbox')
+      .eq('status', 'new')
       .is('consolidated_into', null)
       .order('created_at', { ascending: false })
 

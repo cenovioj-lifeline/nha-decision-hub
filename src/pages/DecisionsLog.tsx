@@ -22,7 +22,7 @@ interface DecisionRow {
   requests: RequestInfo | RequestInfo[] | null
 }
 
-const ACTION_FILTERS = ['all', 'approve', 'decline', 'merge', 'discuss', 'defer']
+const ACTION_FILTERS = ['all', 'approve', 'decline', 'on_hold']
 
 function getRequest(d: DecisionRow): RequestInfo | null {
   if (!d.requests) return null

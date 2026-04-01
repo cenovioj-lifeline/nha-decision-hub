@@ -135,7 +135,6 @@ export default function RequestDetail() {
     priority_suggestion?: string
   } | null
 
-  const relatedItems = analysis?.related ?? analysis?.related_items ?? []
   // attachments may come back as a JSON string from PostgREST
   if (request.attachments && typeof request.attachments === 'string') {
     try { request.attachments = JSON.parse(request.attachments) } catch { request.attachments = null }
@@ -367,10 +366,10 @@ export default function RequestDetail() {
                 </a>
               )}
             </div>
-          ) : request.status === 'inbox' ? (
+          ) : request.status !== 'completed' ? (
             <div className="bg-white rounded-2xl border border-nha-gray-200 p-6">
               {/* Email reply indicator */}
-              {isEmail && request.requester_email && (
+              {isEmail && request.requester_email && request.status === 'new' && (
                 <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-700">
                   <Reply size={14} className="shrink-0" />
                   Decision reply will be sent to <strong>{request.requester_email}</strong>
@@ -378,7 +377,7 @@ export default function RequestDetail() {
               )}
               <DecisionForm
                 requestId={request.id}
-                relatedItems={relatedItems.map((r) => ({ task_id: r.task_id, task_name: r.task_name }))}
+                currentStatus={request.status}
                 onDecided={fetchData}
               />
             </div>

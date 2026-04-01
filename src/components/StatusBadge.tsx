@@ -1,19 +1,29 @@
 import { cn } from '../lib/utils'
 
 const STATUS_STYLES: Record<string, string> = {
-  inbox: 'bg-nha-sky-light text-nha-sky',
-  decided: 'bg-nha-blue-light text-nha-blue',
+  new: 'bg-nha-sky-light text-nha-sky',
+  approved: 'bg-green-100 text-green-700',
+  declined: 'bg-red-100 text-red-700',
+  on_hold: 'bg-amber-100 text-amber-700',
   tracking: 'bg-nha-orange-light text-nha-orange',
   completed: 'bg-green-100 text-green-700',
-  declined: 'bg-red-100 text-red-700',
+  consolidated: 'bg-nha-gray-100 text-nha-gray-600',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  new: 'New',
+  approved: 'Approved',
+  declined: 'Declined',
+  on_hold: 'On Hold',
+  tracking: 'In Progress',
+  completed: 'Completed',
+  consolidated: 'Consolidated',
 }
 
 const ACTION_STYLES: Record<string, string> = {
   approve: 'bg-green-100 text-green-700',
   decline: 'bg-red-100 text-red-700',
-  merge: 'bg-purple-100 text-purple-700',
-  discuss: 'bg-yellow-100 text-yellow-700',
-  defer: 'bg-nha-gray-100 text-nha-gray-600',
+  on_hold: 'bg-amber-100 text-amber-700',
 }
 
 const SOURCE_STYLES: Record<string, string> = {
@@ -35,6 +45,7 @@ export default function StatusBadge({ value, type = 'status', className }: Statu
       ? SOURCE_STYLES
       : STATUS_STYLES
   const style = styles[value] ?? 'bg-nha-gray-100 text-nha-gray-600'
+  const label = type === 'status' ? (STATUS_LABELS[value] ?? value) : value
 
   return (
     <span className={cn(
@@ -42,7 +53,7 @@ export default function StatusBadge({ value, type = 'status', className }: Statu
       style,
       className,
     )}>
-      {value}
+      {label}
     </span>
   )
 }
