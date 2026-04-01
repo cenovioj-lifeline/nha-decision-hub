@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Check, X, Pause, RotateCcw, GitMerge } from 'lucide-react'
 import { cn } from '../lib/utils'
-import { dhub } from '../lib/supabase'
+import { dhub, supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+
+const EXECUTE_FUNCTION_URL = 'https://nhwdgstjhugezhqlktie.supabase.co/functions/v1/dhub-execute-decision'
 
 type Action = 'approve' | 'decline' | 'on_hold' | 'merge'
 
@@ -93,8 +95,26 @@ export default function DecisionForm({ requestId, currentStatus, onDecided }: De
         decision.merged_with_task_id = mergeTargetId
       }
 
-      const { error: insertError } = await dhub.from('decisions').insert(decision)
+      const { data: insertedDecision, error: insertError } = await dhub
+        .from('decisions')
+        .insert(decision)
+        .select('id')
+        .single()
       if (insertError) throw insertError
+
+      // Fire-and-forget: trigger ClickUp task creation for approvals
+      if (action === 'approve' && insertedDecision?.id) {
+        const { data: { session } } = await supabase.auth.getSession()
+        fetch(EXECUTE_FUNCTION_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token ?? ''}`,
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5od2Rnc3RqaHVnZXpocWxrdGllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTUzMjMsImV4cCI6MjA2ODc3MTMyM30.dsN6HiFYtM1MXxOcyaI-O7vbJxN-si1V3Eth0oIY2JE',
+          },
+          body: JSON.stringify({ decision_id: insertedDecision.id }),
+        }).catch((err) => console.error('ClickUp execution failed:', err))
+      }
 
       const statusMap: Record<Action, string> = {
         approve: 'approved',
