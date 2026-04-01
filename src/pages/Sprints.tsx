@@ -53,11 +53,7 @@ export default function Sprints() {
       }
       setSprints(sprintData as Sprint[])
 
-      // Auto-expand active sprints
-      const activeIds = new Set(
-        (sprintData as Sprint[]).filter((s) => s.status === 'active').map((s) => s.id),
-      )
-      setExpanded(activeIds)
+      // All collapsed by default
 
       // Fetch decisions with sprint assignments
       const { data: decisions } = await dhub
