@@ -33,6 +33,8 @@ const ACTIONS: { value: Action; label: string; icon: typeof Check; color: string
 
 const PRIORITIES = ['urgent', 'high', 'normal', 'low']
 
+const AUTO_EXECUTE_ACTIONS: Action[] = ['decline', 'defer', 'discuss']
+
 export default function DecisionForm({ requestId, relatedItems, onDecided }: DecisionFormProps) {
   const { user } = useAuth()
   const [action, setAction] = useState<Action | null>(null)
@@ -64,13 +66,17 @@ export default function DecisionForm({ requestId, relatedItems, onDecided }: Dec
     setError('')
 
     try {
+      const autoExecute = AUTO_EXECUTE_ACTIONS.includes(action)
+      const now = new Date().toISOString()
+
       const decision: Record<string, unknown> = {
         request_id: requestId,
         action,
         rationale,
         decided_by: user?.id,
-        decided_at: new Date().toISOString(),
-        executed: false,
+        decided_at: now,
+        executed: autoExecute,
+        ...(autoExecute && { executed_at: now }),
       }
 
       if (action === 'approve') {
