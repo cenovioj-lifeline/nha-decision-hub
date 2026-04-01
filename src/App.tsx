@@ -11,7 +11,7 @@ import Sprints from './pages/Sprints'
 import Dashboard from './pages/Dashboard'
 
 function RootRedirect() {
-  const { user, isAdmin, loading } = useAuth()
+  const { user, isAdmin, isViewer, loading } = useAuth()
 
   if (loading) {
     return (
@@ -21,6 +21,7 @@ function RootRedirect() {
     )
   }
 
+  if (isViewer) return <Navigate to="/inbox" replace />
   if (!user) return <Navigate to="/login" replace />
   return <Navigate to={isAdmin ? '/inbox' : '/requests'} replace />
 }

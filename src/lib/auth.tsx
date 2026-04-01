@@ -6,9 +6,12 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   isAdmin: boolean
+  isViewer: boolean
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
+  enterViewMode: () => void
+  exitViewMode: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -19,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isViewer, setIsViewer] = useState(() => sessionStorage.getItem('dhub_viewer') === '1')
 
   const isAdmin = user?.email === ADMIN_EMAIL
 
@@ -26,12 +30,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s)
       setUser(s?.user ?? null)
+      if (s?.user) setIsViewer(false)
       setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s)
       setUser(s?.user ?? null)
+      if (s?.user) {
+        setIsViewer(false)
+        sessionStorage.removeItem('dhub_viewer')
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -39,6 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (!error) {
+      setIsViewer(false)
+      sessionStorage.removeItem('dhub_viewer')
+    }
     return { error: error as Error | null }
   }
 
@@ -48,8 +61,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null)
   }
 
+  function enterViewMode() {
+    setIsViewer(true)
+    sessionStorage.setItem('dhub_viewer', '1')
+  }
+
+  function exitViewMode() {
+    setIsViewer(false)
+    sessionStorage.removeItem('dhub_viewer')
+  }
+
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, isAdmin, isViewer, loading, signIn, signOut, enterViewMode, exitViewMode }}>
       {children}
     </AuthContext.Provider>
   )

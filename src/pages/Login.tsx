@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Eye } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 
 export default function Login() {
-  const { signIn } = useAuth()
+  const { signIn, enterViewMode } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -84,6 +85,31 @@ export default function Login() {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        <div className="mt-4 text-center">
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-nha-gray-200" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-nha-gray-50 px-3 text-xs text-nha-gray-400">or</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              enterViewMode()
+              navigate('/inbox', { replace: true })
+            }}
+            className="w-full py-2.5 rounded-lg border border-nha-gray-200 text-sm font-medium text-nha-gray-600 hover:bg-white hover:border-nha-gray-300 transition-colors flex items-center justify-center gap-2"
+          >
+            <Eye size={16} />
+            View Only
+          </button>
+          <p className="text-xs text-nha-gray-400 mt-2">
+            Browse requests and decisions without signing in
+          </p>
+        </div>
 
         <p className="text-center text-xs text-nha-gray-400 mt-4">
           Access restricted to @nhaschools.com accounts

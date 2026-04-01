@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, adminOnly = false }: ProtectedRouteProps) {
-  const { user, isAdmin, loading } = useAuth()
+  const { user, isAdmin, isViewer, loading } = useAuth()
 
   if (loading) {
     return (
@@ -15,6 +15,11 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-nha-blue" />
       </div>
     )
+  }
+
+  // Allow viewers through all routes (they see everything, can't act)
+  if (isViewer) {
+    return <>{children}</>
   }
 
   if (!user) {

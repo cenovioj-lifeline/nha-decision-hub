@@ -4,11 +4,13 @@ import {
   Inbox,
   LayoutDashboard,
   FileText,
+  LogIn,
   LogOut,
   Menu,
   X,
   Bell,
   Calendar,
+  Eye,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { cn } from '../lib/utils'
@@ -28,11 +30,12 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 export default function Layout() {
-  const { user, isAdmin, signOut } = useAuth()
+  const { user, isAdmin, isViewer, signOut, exitViewMode } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const visibleItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin)
+  // Viewers see all nav items (read-only access to everything)
+  const visibleItems = NAV_ITEMS.filter((item) => isViewer || !item.adminOnly || isAdmin)
 
   async function handleSignOut() {
     await signOut()
@@ -91,17 +94,41 @@ export default function Layout() {
         </nav>
 
         <div className="px-3 py-4 border-t border-white/10">
-          <div className="px-3 mb-3">
-            <p className="text-white text-sm font-medium truncate">{user?.email}</p>
-            <p className="text-white/40 text-xs">{isAdmin ? 'Admin' : 'Viewer'}</p>
-          </div>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors w-full"
-          >
-            <LogOut size={18} />
-            Sign Out
-          </button>
+          {isViewer ? (
+            <>
+              <div className="px-3 mb-3 flex items-center gap-2">
+                <Eye size={14} className="text-white/40" />
+                <div>
+                  <p className="text-white text-sm font-medium">View Only</p>
+                  <p className="text-white/40 text-xs">Read-only access</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  exitViewMode()
+                  navigate('/login')
+                }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors w-full"
+              >
+                <LogIn size={18} />
+                Sign In
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="px-3 mb-3">
+                <p className="text-white text-sm font-medium truncate">{user?.email}</p>
+                <p className="text-white/40 text-xs">{isAdmin ? 'Admin' : 'Member'}</p>
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors w-full"
+              >
+                <LogOut size={18} />
+                Sign Out
+              </button>
+            </>
+          )}
         </div>
       </aside>
 
@@ -117,17 +144,26 @@ export default function Layout() {
           </button>
           <div className="lg:flex-1" />
           <div className="flex items-center gap-3">
-            <button className="relative text-nha-gray-400 hover:text-nha-gray-600 transition-colors">
-              <Bell size={20} />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-nha-orange text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                0
+            {isViewer ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-nha-gray-100 text-xs font-medium text-nha-gray-500">
+                <Eye size={12} />
+                View Only
               </span>
-            </button>
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-nha-blue flex items-center justify-center text-white text-xs font-bold">
-                {user?.email?.charAt(0).toUpperCase()}
-              </div>
-            </div>
+            ) : (
+              <>
+                <button className="relative text-nha-gray-400 hover:text-nha-gray-600 transition-colors">
+                  <Bell size={20} />
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-nha-orange text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    0
+                  </span>
+                </button>
+                <div className="hidden sm:flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-nha-blue flex items-center justify-center text-white text-xs font-bold">
+                    {user?.email?.charAt(0).toUpperCase()}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </header>
 

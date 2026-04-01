@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, Clock, ExternalLink, Image, Layers, Mail, MessageSquare, Paperclip, Pencil, Reply, X } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { timeAgo, formatDateTime } from '../lib/utils'
+import { useAuth } from '../lib/auth'
 import CategoryIcon from '../components/CategoryIcon'
 import StatusBadge from '../components/StatusBadge'
 import AnalysisPanel from '../components/AnalysisPanel'
@@ -59,6 +60,7 @@ interface Decision {
 export default function RequestDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { isViewer } = useAuth()
   const [request, setRequest] = useState<Request | null>(null)
   const [decision, setDecision] = useState<Decision | null>(null)
   const [loading, setLoading] = useState(true)
@@ -213,7 +215,11 @@ export default function RequestDetail() {
               <CategoryIcon category={request.category} />
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  {editingTitle ? (
+                  {isViewer ? (
+                    <h1 className="text-xl font-bold text-nha-gray-900">
+                      {request.title}
+                    </h1>
+                  ) : editingTitle ? (
                     <div className="flex items-center gap-2 flex-1">
                       <input
                         ref={titleInputRef}
@@ -294,19 +300,28 @@ export default function RequestDetail() {
             )}
 
             {/* Cenovio's Notes */}
-            <div className="mb-4">
-              <label className="block text-xs font-bold uppercase tracking-wider text-nha-gray-400 mb-2">
-                Cenovio's Notes
-                {poNotesSaved && <span className="ml-2 text-green-600 normal-case font-medium">Saved</span>}
-              </label>
-              <textarea
-                value={poNotes}
-                onChange={e => handlePoNotesChange(e.target.value)}
-                rows={2}
-                placeholder="Add clarification, context, or instructions for the dev team..."
-                className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm text-nha-gray-700 focus:outline-none focus:ring-2 focus:ring-nha-blue/20 focus:border-nha-blue resize-none"
-              />
-            </div>
+            {!isViewer ? (
+              <div className="mb-4">
+                <label className="block text-xs font-bold uppercase tracking-wider text-nha-gray-400 mb-2">
+                  Cenovio's Notes
+                  {poNotesSaved && <span className="ml-2 text-green-600 normal-case font-medium">Saved</span>}
+                </label>
+                <textarea
+                  value={poNotes}
+                  onChange={e => handlePoNotesChange(e.target.value)}
+                  rows={2}
+                  placeholder="Add clarification, context, or instructions for the dev team..."
+                  className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm text-nha-gray-700 focus:outline-none focus:ring-2 focus:ring-nha-blue/20 focus:border-nha-blue resize-none"
+                />
+              </div>
+            ) : poNotes ? (
+              <div className="mb-4">
+                <label className="block text-xs font-bold uppercase tracking-wider text-nha-gray-400 mb-2">
+                  Notes
+                </label>
+                <p className="text-sm text-nha-gray-700 whitespace-pre-wrap">{poNotes}</p>
+              </div>
+            ) : null}
 
             {/* Description */}
             {request.description ? (
@@ -453,7 +468,7 @@ export default function RequestDetail() {
                 </a>
               )}
             </div>
-          ) : request.status !== 'completed' ? (
+          ) : !isViewer && request.status !== 'completed' ? (
             <div className="bg-white rounded-2xl border border-nha-gray-200 p-6">
               {/* Email reply indicator */}
               {isEmail && request.requester_email && request.status === 'new' && (
@@ -480,15 +495,19 @@ export default function RequestDetail() {
             <h3 className="font-semibold text-nha-gray-800">Details</h3>
             <div className="flex justify-between items-center">
               <span className="text-nha-gray-500">Category</span>
-              <select
-                value={request.category}
-                onChange={e => handleCategoryChange(e.target.value)}
-                className="text-sm font-medium text-nha-gray-700 bg-transparent border border-nha-gray-200 rounded-lg px-2 py-1 cursor-pointer hover:border-nha-gray-300 focus:outline-none focus:ring-2 focus:ring-nha-blue/20 capitalize"
-              >
-                {CATEGORIES.map(c => (
-                  <option key={c} value={c} className="capitalize">{c}</option>
-                ))}
-              </select>
+              {isViewer ? (
+                <span className="text-sm font-medium text-nha-gray-700 capitalize">{request.category}</span>
+              ) : (
+                <select
+                  value={request.category}
+                  onChange={e => handleCategoryChange(e.target.value)}
+                  className="text-sm font-medium text-nha-gray-700 bg-transparent border border-nha-gray-200 rounded-lg px-2 py-1 cursor-pointer hover:border-nha-gray-300 focus:outline-none focus:ring-2 focus:ring-nha-blue/20 capitalize"
+                >
+                  {CATEGORIES.map(c => (
+                    <option key={c} value={c} className="capitalize">{c}</option>
+                  ))}
+                </select>
+              )}
             </div>
             {request.dev_estimate_hours != null && (
               <div className="flex justify-between">
