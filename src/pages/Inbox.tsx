@@ -13,6 +13,8 @@ interface Request {
   ai_analysis: Record<string, unknown> | null
   ai_analyzed_at: string | null
   status: string
+  dev_estimate_hours: number | null
+  metadata: Record<string, unknown> | null
 }
 
 export default function Inbox() {
@@ -27,7 +29,7 @@ export default function Inbox() {
       .from('requests')
       .select('*')
       .eq('status', 'inbox')
-      .neq('title', '')
+      .is('consolidated_into', null)
       .order('created_at', { ascending: false })
 
     if (fetchError) {

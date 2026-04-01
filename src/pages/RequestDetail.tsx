@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, Paperclip, Mail, Reply } from 'lucide-react'
+import { ArrowLeft, Clock, ExternalLink, Layers, Mail, MessageSquare, Paperclip, Reply } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { timeAgo, formatDateTime } from '../lib/utils'
 import CategoryIcon from '../components/CategoryIcon'
@@ -24,10 +24,22 @@ interface Request {
   status: string
   created_at: string
   updated_at: string
+  dev_estimate_hours: number | null
   metadata: {
     cc?: string | null
     subject_full?: string | null
     message_id?: string | null
+    is_consolidated?: boolean
+    source_count?: number
+    source_messages?: {
+      id: string
+      author: string
+      source: string
+      date: string
+      original_text: string
+      has_attachment: boolean
+    }[]
+    consolidation_reasoning?: string
   } | null
 }
 
@@ -256,6 +268,63 @@ export default function RequestDetail() {
             )}
           </div>
 
+          {/* Sources */}
+          {request.metadata?.source_messages && request.metadata.source_messages.length > 0 && (
+            <div className="bg-white rounded-2xl border border-nha-gray-200 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                {request.metadata.is_consolidated ? (
+                  <>
+                    <Layers size={16} className="text-purple-600" />
+                    <h3 className="font-semibold text-nha-gray-800">
+                      Consolidated from {request.metadata.source_count} messages
+                    </h3>
+                  </>
+                ) : (
+                  <>
+                    {request.source === 'email' ? (
+                      <Mail size={16} className="text-blue-600" />
+                    ) : (
+                      <MessageSquare size={16} className="text-green-600" />
+                    )}
+                    <h3 className="font-semibold text-nha-gray-800">
+                      Original {request.source === 'email' ? 'Email' : 'Slack Message'}
+                    </h3>
+                  </>
+                )}
+              </div>
+              {request.metadata.consolidation_reasoning && (
+                <p className="text-sm text-nha-gray-500 mb-4 italic">
+                  {request.metadata.consolidation_reasoning}
+                </p>
+              )}
+              <div className="space-y-3">
+                {request.metadata.source_messages.map((msg, i) => (
+                  <div
+                    key={msg.id || i}
+                    className="bg-nha-gray-50 rounded-lg border border-nha-gray-100 p-3"
+                  >
+                    <div className="flex items-center gap-2 text-xs text-nha-gray-500 mb-1.5">
+                      <span className="font-medium text-nha-gray-700">{msg.author}</span>
+                      <span className="text-nha-gray-300">·</span>
+                      <span className="capitalize">{msg.source}</span>
+                      <span className="text-nha-gray-300">·</span>
+                      <span>{msg.date}</span>
+                      {msg.has_attachment && (
+                        <>
+                          <span className="text-nha-gray-300">·</span>
+                          <Paperclip size={10} />
+                        </>
+                      )}
+                    </div>
+                    <p className="text-sm text-nha-gray-700 whitespace-pre-wrap">
+                      {msg.original_text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Decision */}
           {decision ? (
             <div className="bg-white rounded-2xl border border-nha-gray-200 p-6">
@@ -321,6 +390,15 @@ export default function RequestDetail() {
               <span className="text-nha-gray-500">Category</span>
               <span className="capitalize text-nha-gray-700">{request.category}</span>
             </div>
+            {request.dev_estimate_hours != null && (
+              <div className="flex justify-between">
+                <span className="text-nha-gray-500">Dev Estimate</span>
+                <span className="inline-flex items-center gap-1 text-nha-gray-700">
+                  <Clock size={12} />
+                  {request.dev_estimate_hours === 0 ? 'N/A' : `${request.dev_estimate_hours}h`}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-nha-gray-500">Source</span>
               <span className="capitalize text-nha-gray-700">{request.source}</span>

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Clock, Mail, MessageSquare } from 'lucide-react'
+import { Clock, Layers, Mail, MessageSquare } from 'lucide-react'
 import CategoryIcon from './CategoryIcon'
 import StatusBadge from './StatusBadge'
 import { timeAgo } from '../lib/utils'
@@ -14,6 +14,11 @@ interface Request {
   ai_analysis: Record<string, unknown> | null
   ai_analyzed_at: string | null
   status: string
+  dev_estimate_hours: number | null
+  metadata: {
+    is_consolidated?: boolean
+    source_count?: number
+  } | null
 }
 
 interface RequestCardProps {
@@ -29,6 +34,9 @@ export default function RequestCard({ request }: RequestCardProps) {
   const navigate = useNavigate()
   const analysis = request.ai_analysis as { summary?: string } | null
   const SourceIcon = SOURCE_ICONS[request.source]
+  const meta = request.metadata as { is_consolidated?: boolean; source_count?: number } | null
+  const isConsolidated = meta?.is_consolidated === true
+  const sourceCount = meta?.source_count ?? 1
 
   return (
     <button
@@ -43,7 +51,7 @@ export default function RequestCard({ request }: RequestCardProps) {
               {request.title}
             </h3>
           </div>
-          <div className="flex items-center gap-2 text-sm text-nha-gray-500 mb-2">
+          <div className="flex items-center gap-2 text-sm text-nha-gray-500 mb-2 flex-wrap">
             <span>{request.requester_name}</span>
             <span className="text-nha-gray-300">|</span>
             <span className="flex items-center gap-1">
@@ -55,14 +63,24 @@ export default function RequestCard({ request }: RequestCardProps) {
               <Clock size={12} />
               {timeAgo(request.created_at)}
             </span>
+            {request.dev_estimate_hours != null && request.dev_estimate_hours > 0 && (
+              <>
+                <span className="text-nha-gray-300">|</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                  {request.dev_estimate_hours}h est.
+                </span>
+              </>
+            )}
+            {isConsolidated && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                <Layers size={10} />
+                {sourceCount} messages
+              </span>
+            )}
           </div>
           {analysis?.summary ? (
             <p className="text-sm text-nha-gray-600 line-clamp-2">{analysis.summary}</p>
-          ) : (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-              Awaiting analysis
-            </span>
-          )}
+          ) : null}
         </div>
       </div>
     </button>
