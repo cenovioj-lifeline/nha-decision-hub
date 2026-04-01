@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Inbox as InboxIcon, RefreshCw, Clock, Sparkles } from 'lucide-react'
 import { dhub } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 import RequestCard from '../components/RequestCard'
 
 interface Request {
@@ -18,6 +19,7 @@ interface Request {
 }
 
 export default function Inbox() {
+  const { isAdmin } = useAuth()
   const [requests, setRequests] = useState<Request[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -106,14 +108,16 @@ export default function Inbox() {
           )
         })()}
         <div className="flex items-center gap-2">
-          <button
-            onClick={runConsolidation}
-            disabled={processing}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-200 text-sm text-purple-600 hover:bg-purple-50 transition-colors"
-          >
-            <Sparkles size={14} className={processing ? 'animate-pulse' : ''} />
-            {processing ? 'Processing...' : 'Process Now'}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={runConsolidation}
+              disabled={processing}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-200 text-sm text-purple-600 hover:bg-purple-50 transition-colors"
+            >
+              <Sparkles size={14} className={processing ? 'animate-pulse' : ''} />
+              {processing ? 'Processing...' : 'Process Now'}
+            </button>
+          )}
           <button
             onClick={fetchRequests}
             disabled={loading}
