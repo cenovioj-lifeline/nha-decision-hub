@@ -207,9 +207,13 @@ export default function DecisionForm({ requestId, currentStatus, onDecided }: De
     setError('')
 
     try {
+      // Delete any existing decision records for this request
+      await dhub.from('decisions').delete().eq('request_id', requestId)
+
+      // Reset request status to new and clear consolidated_into
       const { error: updateError } = await dhub
         .from('requests')
-        .update({ status: 'new', updated_at: new Date().toISOString() })
+        .update({ status: 'new', consolidated_into: null, updated_at: new Date().toISOString() })
         .eq('id', requestId)
       if (updateError) throw updateError
 
@@ -225,19 +229,7 @@ export default function DecisionForm({ requestId, currentStatus, onDecided }: De
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-nha-gray-800">Status</h3>
-        {canReset && (
-          <button
-            onClick={handleResetToNew}
-            disabled={submitting}
-            className="flex items-center gap-1.5 text-xs text-nha-gray-500 hover:text-nha-gray-700 transition-colors"
-          >
-            <RotateCcw size={12} />
-            Reset to New
-          </button>
-        )}
-      </div>
+      <h3 className="font-semibold text-nha-gray-800">Status</h3>
 
       <div className="flex flex-wrap gap-2">
         {ACTIONS.map((a) => {
@@ -259,6 +251,16 @@ export default function DecisionForm({ requestId, currentStatus, onDecided }: De
             </button>
           )
         })}
+        {canReset && (
+          <button
+            onClick={handleResetToNew}
+            disabled={submitting}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all border-nha-gray-300 bg-nha-gray-50 hover:bg-nha-gray-100 text-nha-gray-600 ring-nha-gray-200"
+          >
+            <RotateCcw size={16} className="text-nha-gray-400" />
+            Clear
+          </button>
+        )}
       </div>
 
       {action === 'merge' && (
