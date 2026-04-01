@@ -89,8 +89,9 @@ export default function Inbox() {
           </p>
         </div>
         {(() => {
-          const totalHours = requests.reduce((sum, r) => sum + (r.dev_estimate_hours ?? 0), 0)
-          const estimated = requests.filter(r => r.dev_estimate_hours != null).length
+          const countable = requests.filter(r => r.source !== 'manual')
+          const totalHours = countable.reduce((sum, r) => sum + (r.dev_estimate_hours ?? 0), 0)
+          const estimated = countable.filter(r => r.dev_estimate_hours != null).length
           if (totalHours === 0) return null
           const days = Math.floor(totalHours / 8)
           const hours = totalHours % 8
@@ -102,7 +103,7 @@ export default function Inbox() {
               <Clock size={16} className="text-nha-gray-400" />
               <div className="text-right">
                 <p className="text-sm font-semibold text-nha-gray-700">{label.trim()} total</p>
-                <p className="text-xs text-nha-gray-400">{estimated} of {requests.length} estimated</p>
+                <p className="text-xs text-nha-gray-400">{estimated} of {countable.length} estimated</p>
               </div>
             </div>
           )
