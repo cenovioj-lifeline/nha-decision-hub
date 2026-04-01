@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Clock, ExternalLink, Image, Layers, Mail, MessageSquare, Paperclip, Pencil, Reply, RotateCcw, X } from 'lucide-react'
+import { ArrowLeft, Check, Clock, ExternalLink, Image, Layers, Mail, MessageSquare, Paperclip, Pencil, Reply, X } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { timeAgo, formatDateTime } from '../lib/utils'
 import { useAuth } from '../lib/auth'
@@ -433,46 +433,28 @@ export default function RequestDetail() {
           )}
 
           {/* Decision */}
-          {decision ? (
+          {!isViewer && request.status !== 'completed' ? (
             <div className="bg-white rounded-2xl border border-nha-gray-200 p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-nha-gray-800">Decision</h3>
-                {!isViewer && (
-                  <button
-                    onClick={async () => {
-                      await dhub.from('decisions').delete().eq('request_id', request.id)
-                      await dhub.from('requests').update({ status: 'new', consolidated_into: null, updated_at: new Date().toISOString() }).eq('id', request.id)
-                      fetchData()
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-nha-gray-200 text-sm text-nha-gray-500 hover:bg-nha-gray-50 hover:text-nha-gray-700 transition-colors"
-                  >
-                    <RotateCcw size={14} />
-                    Clear Decision
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-3 mb-3 flex-wrap">
-                <StatusBadge value={decision.action} type="action" />
-                {decision.priority && (
-                  <span className="text-sm text-nha-gray-500">Priority: {decision.priority}</span>
-                )}
-                {(() => {
-                  const sprint = Array.isArray(decision.sprints) ? decision.sprints[0] : decision.sprints
-                  return sprint ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-nha-sky-light text-nha-sky border border-nha-sky/20">
-                      Sprint {sprint.label}
-                    </span>
-                  ) : null
-                })()}
-                {decision.cenovio_estimate != null && (
-                  <span className="text-sm text-nha-gray-500">{decision.cenovio_estimate}h estimate</span>
-                )}
-                <span className="text-sm text-nha-gray-400">{formatDateTime(decision.decided_at)}</span>
-              </div>
-              {decision.rationale && (
-                <p className="text-sm text-nha-gray-700 whitespace-pre-wrap">{decision.rationale}</p>
+              {isEmail && request.requester_email && request.status === 'new' && (
+                <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-700">
+                  <Reply size={14} className="shrink-0" />
+                  Decision reply will be sent to <strong>{request.requester_email}</strong>
+                </div>
               )}
-              {decision.clickup_task_url && (
+              <DecisionForm
+                requestId={request.id}
+                currentStatus={request.status}
+                existingDecision={decision ? {
+                  id: decision.id,
+                  action: decision.action,
+                  rationale: decision.rationale,
+                  priority: decision.priority,
+                  sprint_id: decision.sprint_id,
+                  cenovio_estimate: decision.cenovio_estimate,
+                } : null}
+                onDecided={fetchData}
+              />
+              {decision?.clickup_task_url && (
                 <a
                   href={decision.clickup_task_url}
                   target="_blank"
@@ -483,20 +465,15 @@ export default function RequestDetail() {
                 </a>
               )}
             </div>
-          ) : !isViewer && request.status !== 'completed' ? (
+          ) : decision ? (
             <div className="bg-white rounded-2xl border border-nha-gray-200 p-6">
-              {/* Email reply indicator */}
-              {isEmail && request.requester_email && request.status === 'new' && (
-                <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-700">
-                  <Reply size={14} className="shrink-0" />
-                  Decision reply will be sent to <strong>{request.requester_email}</strong>
-                </div>
-              )}
-              <DecisionForm
-                requestId={request.id}
-                currentStatus={request.status}
-                onDecided={fetchData}
-              />
+              <h3 className="font-semibold text-nha-gray-800 mb-3">Decision</h3>
+              <div className="flex items-center gap-3 flex-wrap">
+                <StatusBadge value={decision.action} type="action" />
+                {decision.priority && <span className="text-sm text-nha-gray-500">Priority: {decision.priority}</span>}
+                <span className="text-sm text-nha-gray-400">{formatDateTime(decision.decided_at)}</span>
+              </div>
+              {decision.rationale && <p className="text-sm text-nha-gray-700 whitespace-pre-wrap mt-3">{decision.rationale}</p>}
             </div>
           ) : null}
         </div>
