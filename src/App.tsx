@@ -41,7 +41,7 @@ export default function App() {
             }
           >
             <Route path="/inbox" element={<ProtectedRoute adminOnly><Inbox /></ProtectedRoute>} />
-            <Route path="/requests/:id" element={<ProtectedRoute adminOnly><RequestDetail /></ProtectedRoute>} />
+            <Route path="/requests/:id" element={<RequestDetail />} />
             <Route path="/sprints" element={<ProtectedRoute adminOnly><Sprints /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
             <Route path="/requests" element={<RequestsAndDecisions />} />

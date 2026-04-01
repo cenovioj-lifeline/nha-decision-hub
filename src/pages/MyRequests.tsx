@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
-import { FileText, ExternalLink, ChevronDown, Clock, CheckCircle, XCircle, ArrowRight, Filter } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { FileText, ExternalLink, ChevronDown, Clock, CheckCircle, XCircle, ArrowRight, Filter, ArrowUpDown } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { formatDate } from '../lib/utils'
@@ -85,10 +86,12 @@ const FILTER_OPTIONS: { value: OutcomeFilter; label: string }[] = [
 
 export default function RequestsAndDecisions() {
   const { isAdmin } = useAuth()
+  const navigate = useNavigate()
   const [requests, setRequests] = useState<Request[]>([])
   const [people, setPeople] = useState<PersonOption[]>([])
   const [selectedPerson, setSelectedPerson] = useState<string>('all')
   const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>('all')
+  const [sortNewest, setSortNewest] = useState(true)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -120,18 +123,22 @@ export default function RequestsAndDecisions() {
   const filtered = useMemo(() => {
     let result = requests
 
-    // Person filter
     if (selectedPerson !== 'all') {
       result = result.filter(r => r.requester_email === selectedPerson)
     }
 
-    // Outcome filter
     if (outcomeFilter !== 'all') {
       result = result.filter(r => getOutcome(r).type === outcomeFilter)
     }
 
+    // Sort by submitted date
+    result = [...result].sort((a, b) => {
+      const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      return sortNewest ? -diff : diff
+    })
+
     return result
-  }, [requests, selectedPerson, outcomeFilter])
+  }, [requests, selectedPerson, outcomeFilter, sortNewest])
 
   // Counts for filter pills
   const counts = useMemo(() => {
@@ -194,7 +201,7 @@ export default function RequestsAndDecisions() {
         )}
       </div>
 
-      {/* Filter pills */}
+      {/* Filter pills + sort */}
       <div className="flex items-center gap-1 mb-6">
         <Filter size={14} className="text-nha-gray-400 mr-1" />
         {FILTER_OPTIONS.map(opt => (
@@ -215,6 +222,15 @@ export default function RequestsAndDecisions() {
             )}
           </button>
         ))}
+        <div className="ml-auto">
+          <button
+            onClick={() => setSortNewest(prev => !prev)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-nha-gray-500 bg-nha-gray-50 hover:bg-nha-gray-100 transition-colors"
+          >
+            <ArrowUpDown size={12} />
+            {sortNewest ? 'Newest first' : 'Oldest first'}
+          </button>
+        </div>
       </div>
 
       {/* Content */}
@@ -233,7 +249,7 @@ export default function RequestsAndDecisions() {
                 Awaiting Review ({pending.length})
               </h2>
               <div className="space-y-2">
-                {pending.map(req => <RequestCard key={req.id} request={req} />)}
+                {pending.map(req => <RequestCard key={req.id} request={req} onClick={() => navigate(`/requests/${req.id}`)} />)}
               </div>
             </div>
           )}
@@ -245,7 +261,7 @@ export default function RequestsAndDecisions() {
                 </h2>
               )}
               <div className="space-y-2">
-                {decided.map(req => <RequestCard key={req.id} request={req} />)}
+                {decided.map(req => <RequestCard key={req.id} request={req} onClick={() => navigate(`/requests/${req.id}`)} />)}
               </div>
             </div>
           )}
@@ -253,20 +269,23 @@ export default function RequestsAndDecisions() {
       ) : (
         /* Flat list when filtered to a specific outcome */
         <div className="space-y-2">
-          {filtered.map(req => <RequestCard key={req.id} request={req} />)}
+          {filtered.map(req => <RequestCard key={req.id} request={req} onClick={() => navigate(`/requests/${req.id}`)} />)}
         </div>
       )}
     </div>
   )
 }
 
-function RequestCard({ request: req }: { request: Request }) {
+function RequestCard({ request: req, onClick }: { request: Request; onClick: () => void }) {
   const decision = req.decisions?.[0]
   const outcome = getOutcome(req)
   const waiting = daysSince(req.created_at)
 
   return (
-    <div className="bg-white rounded-xl border border-nha-gray-200 px-5 py-4">
+    <div
+      className="bg-white rounded-xl border border-nha-gray-200 px-5 py-4 cursor-pointer hover:border-nha-gray-300 hover:shadow-sm transition-all"
+      onClick={onClick}
+    >
       {/* Row 1: Title + outcome badge */}
       <div className="flex items-start justify-between gap-3 mb-2">
         <h3 className="font-semibold text-nha-gray-900 text-[15px] leading-snug">{req.title || '(No title)'}</h3>
@@ -320,6 +339,7 @@ function RequestCard({ request: req }: { request: Request }) {
               href={decision.clickup_task_url}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
               className="inline-flex items-center gap-1 text-xs font-medium text-nha-sky hover:underline mt-2"
             >
               Track in ClickUp <ExternalLink size={11} />
