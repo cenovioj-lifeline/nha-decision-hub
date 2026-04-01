@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Inbox as InboxIcon, RefreshCw } from 'lucide-react'
+import { Inbox as InboxIcon, RefreshCw, Clock } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import RequestCard from '../components/RequestCard'
 
@@ -53,6 +53,25 @@ export default function Inbox() {
             {requests.length} request{requests.length !== 1 ? 's' : ''} awaiting decision
           </p>
         </div>
+        {(() => {
+          const totalHours = requests.reduce((sum, r) => sum + (r.dev_estimate_hours ?? 0), 0)
+          const estimated = requests.filter(r => r.dev_estimate_hours != null).length
+          if (totalHours === 0) return null
+          const days = Math.floor(totalHours / 8)
+          const hours = totalHours % 8
+          const label = days > 0
+            ? `${days}d ${hours > 0 ? `${hours}h` : ''}`
+            : `${totalHours}h`
+          return (
+            <div className="flex items-center gap-2 px-4 py-2 bg-nha-gray-50 rounded-lg border border-nha-gray-200">
+              <Clock size={16} className="text-nha-gray-400" />
+              <div className="text-right">
+                <p className="text-sm font-semibold text-nha-gray-700">{label.trim()} total</p>
+                <p className="text-xs text-nha-gray-400">{estimated} of {requests.length} estimated</p>
+              </div>
+            </div>
+          )
+        })()}
         <button
           onClick={fetchRequests}
           disabled={loading}
