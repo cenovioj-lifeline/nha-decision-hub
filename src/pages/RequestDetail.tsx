@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Clock, ExternalLink, Image, Layers, Mail, MessageSquare, Paperclip, Pencil, Reply, X } from 'lucide-react'
+import { ArrowLeft, Check, Clock, ExternalLink, Image, Layers, Mail, MessageSquare, Paperclip, Pencil, Reply, RotateCcw, X } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { timeAgo, formatDateTime } from '../lib/utils'
 import { useAuth } from '../lib/auth'
@@ -435,7 +435,22 @@ export default function RequestDetail() {
           {/* Decision */}
           {decision ? (
             <div className="bg-white rounded-2xl border border-nha-gray-200 p-6">
-              <h3 className="font-semibold text-nha-gray-800 mb-3">Decision</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-nha-gray-800">Decision</h3>
+                {!isViewer && (
+                  <button
+                    onClick={async () => {
+                      await dhub.from('decisions').delete().eq('request_id', request.id)
+                      await dhub.from('requests').update({ status: 'new', consolidated_into: null, updated_at: new Date().toISOString() }).eq('id', request.id)
+                      fetchData()
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-nha-gray-200 text-sm text-nha-gray-500 hover:bg-nha-gray-50 hover:text-nha-gray-700 transition-colors"
+                  >
+                    <RotateCcw size={14} />
+                    Clear Decision
+                  </button>
+                )}
+              </div>
               <div className="flex items-center gap-3 mb-3 flex-wrap">
                 <StatusBadge value={decision.action} type="action" />
                 {decision.priority && (
