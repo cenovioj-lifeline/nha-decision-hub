@@ -240,9 +240,11 @@ export default function RequestDetail() {
                   Attachments
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {request.attachments.map((att, i) => (
+                  {request.attachments.map((att, i) => {
+                    const isSlackPrivate = att.url?.includes('files.slack.com/files-pri')
+                    return (
                     <div key={i}>
-                      {att.type?.startsWith('image/') ? (
+                      {att.type?.startsWith('image/') && !isSlackPrivate ? (
                         <a href={att.url} target="_blank" rel="noopener noreferrer">
                           <img
                             src={att.url}
@@ -262,7 +264,8 @@ export default function RequestDetail() {
                         </a>
                       )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
