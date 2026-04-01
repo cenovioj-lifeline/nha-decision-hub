@@ -72,7 +72,7 @@ export default function RequestCard({ request }: RequestCardProps) {
               </>
             )}
             {isConsolidated && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-nha-gray-50 text-nha-gray-600 border border-nha-gray-200">
                 <Layers size={10} />
                 {sourceCount} messages
               </span>

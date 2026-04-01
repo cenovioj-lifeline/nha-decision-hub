@@ -27,7 +27,7 @@ const ACTION_STYLES: Record<string, string> = {
 }
 
 const SOURCE_STYLES: Record<string, string> = {
-  slack: 'bg-purple-100 text-purple-700',
+  slack: 'bg-nha-gray-100 text-nha-gray-600',
   email: 'bg-blue-100 text-blue-700',
   screenshot: 'bg-nha-orange-light text-nha-orange',
 }

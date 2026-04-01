@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Clock, ExternalLink, Image, Layers, Mail, MessageSquare, Paperclip, Reply, X } from 'lucide-react'
+import { ArrowLeft, Check, Clock, ExternalLink, Image, Layers, Mail, MessageSquare, Paperclip, Pencil, Reply, X } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { timeAgo, formatDateTime } from '../lib/utils'
 import CategoryIcon from '../components/CategoryIcon'
@@ -22,6 +22,7 @@ interface Request {
   ai_analysis: Record<string, unknown> | null
   ai_analyzed_at: string | null
   status: string
+  po_notes: string | null
   created_at: string
   updated_at: string
   dev_estimate_hours: number | null
@@ -64,6 +65,52 @@ export default function RequestDetail() {
   const [error, setError] = useState('')
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
+  // Editable fields
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const [poNotes, setPoNotes] = useState('')
+  const [poNotesSaved, setPoNotesSaved] = useState(false)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+  const poNotesTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  const CATEGORIES = ['bug', 'feature', 'ux', 'question', 'data']
+
+  async function updateField(field: string, value: string | null) {
+    if (!id) return
+    await dhub.from('requests').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', id)
+  }
+
+  function handleTitleEdit() {
+    if (!request) return
+    setTitleDraft(request.title)
+    setEditingTitle(true)
+    setTimeout(() => titleInputRef.current?.focus(), 50)
+  }
+
+  async function handleTitleSave() {
+    if (!request || !titleDraft.trim()) return
+    setEditingTitle(false)
+    await updateField('title', titleDraft.trim())
+    setRequest({ ...request, title: titleDraft.trim() })
+  }
+
+  async function handleCategoryChange(newCat: string) {
+    if (!request) return
+    await updateField('category', newCat)
+    setRequest({ ...request, category: newCat })
+  }
+
+  function handlePoNotesChange(value: string) {
+    setPoNotes(value)
+    setPoNotesSaved(false)
+    if (poNotesTimerRef.current) clearTimeout(poNotesTimerRef.current)
+    poNotesTimerRef.current = setTimeout(async () => {
+      await updateField('po_notes', value || null)
+      setPoNotesSaved(true)
+      setTimeout(() => setPoNotesSaved(false), 2000)
+    }, 1000)
+  }
+
   async function fetchData() {
     if (!id) return
     setLoading(true)
@@ -78,7 +125,10 @@ export default function RequestDetail() {
         return
       }
 
-      if (reqRes.data) setRequest(reqRes.data as Request)
+      if (reqRes.data) {
+        setRequest(reqRes.data as Request)
+        setPoNotes((reqRes.data as Request).po_notes || '')
+      }
 
       const decRes = await dhub.from('decisions').select('*, sprints(label)').eq('request_id', id).order('decided_at', { ascending: false }).limit(1)
       if (decRes.data && (decRes.data as Decision[]).length > 0) {
@@ -163,7 +213,29 @@ export default function RequestDetail() {
               <CategoryIcon category={request.category} />
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <h1 className="text-xl font-bold text-nha-gray-900">{request.title}</h1>
+                  {editingTitle ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        ref={titleInputRef}
+                        value={titleDraft}
+                        onChange={e => setTitleDraft(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleTitleSave(); if (e.key === 'Escape') setEditingTitle(false) }}
+                        onBlur={handleTitleSave}
+                        className="text-xl font-bold text-nha-gray-900 bg-transparent border-b-2 border-nha-blue outline-none flex-1 min-w-0"
+                      />
+                      <button onClick={handleTitleSave} className="text-nha-blue hover:text-nha-blue/80">
+                        <Check size={18} />
+                      </button>
+                    </div>
+                  ) : (
+                    <h1
+                      className="text-xl font-bold text-nha-gray-900 cursor-pointer hover:text-nha-blue transition-colors group/title flex items-center gap-2"
+                      onClick={handleTitleEdit}
+                    >
+                      {request.title}
+                      <Pencil size={14} className="text-nha-gray-300 opacity-0 group-hover/title:opacity-100 transition-opacity" />
+                    </h1>
+                  )}
                   <StatusBadge value={request.status} />
                 </div>
                 <div className="flex items-center gap-2 text-sm text-nha-gray-500 flex-wrap">
@@ -220,6 +292,21 @@ export default function RequestDetail() {
                 )}
               </div>
             )}
+
+            {/* Cenovio's Notes */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold uppercase tracking-wider text-nha-gray-400 mb-2">
+                Cenovio's Notes
+                {poNotesSaved && <span className="ml-2 text-green-600 normal-case font-medium">Saved</span>}
+              </label>
+              <textarea
+                value={poNotes}
+                onChange={e => handlePoNotesChange(e.target.value)}
+                rows={2}
+                placeholder="Add clarification, context, or instructions for the dev team..."
+                className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm text-nha-gray-700 focus:outline-none focus:ring-2 focus:ring-nha-blue/20 focus:border-nha-blue resize-none"
+              />
+            </div>
 
             {/* Description */}
             {request.description ? (
@@ -391,9 +478,17 @@ export default function RequestDetail() {
           {/* Meta */}
           <div className="bg-white rounded-2xl border border-nha-gray-200 p-4 space-y-3 text-sm">
             <h3 className="font-semibold text-nha-gray-800">Details</h3>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-nha-gray-500">Category</span>
-              <span className="capitalize text-nha-gray-700">{request.category}</span>
+              <select
+                value={request.category}
+                onChange={e => handleCategoryChange(e.target.value)}
+                className="text-sm font-medium text-nha-gray-700 bg-transparent border border-nha-gray-200 rounded-lg px-2 py-1 cursor-pointer hover:border-nha-gray-300 focus:outline-none focus:ring-2 focus:ring-nha-blue/20 capitalize"
+              >
+                {CATEGORIES.map(c => (
+                  <option key={c} value={c} className="capitalize">{c}</option>
+                ))}
+              </select>
             </div>
             {request.dev_estimate_hours != null && (
               <div className="flex justify-between">
