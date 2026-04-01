@@ -509,15 +509,29 @@ export default function RequestDetail() {
                 </select>
               )}
             </div>
-            {request.dev_estimate_hours != null && (
-              <div className="flex justify-between">
-                <span className="text-nha-gray-500">Dev Estimate</span>
+            <div className="flex justify-between items-center">
+              <span className="text-nha-gray-500">Dev Estimate</span>
+              {isViewer ? (
                 <span className="inline-flex items-center gap-1 text-nha-gray-700">
                   <Clock size={12} />
-                  {request.dev_estimate_hours === 0 ? 'N/A' : `${request.dev_estimate_hours}h`}
+                  {request.dev_estimate_hours == null ? '—' : request.dev_estimate_hours === 0 ? 'N/A' : `${request.dev_estimate_hours}h`}
                 </span>
-              </div>
-            )}
+              ) : (
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={request.dev_estimate_hours ?? ''}
+                  onChange={async (e) => {
+                    const val = e.target.value === '' ? null : parseFloat(e.target.value)
+                    await updateField('dev_estimate_hours', val as unknown as string)
+                    setRequest({ ...request, dev_estimate_hours: val })
+                  }}
+                  className="w-16 text-right text-sm text-nha-gray-700 border border-nha-gray-200 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-nha-sky"
+                  placeholder="0"
+                />
+              )}
+            </div>
             <div className="flex justify-between">
               <span className="text-nha-gray-500">Source</span>
               <span className="capitalize text-nha-gray-700">{request.source}</span>
