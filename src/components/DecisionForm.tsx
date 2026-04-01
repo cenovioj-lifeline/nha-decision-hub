@@ -246,7 +246,7 @@ export default function DecisionForm({ requestId, currentStatus, onDecided }: De
           return (
             <button
               key={a.value}
-              onClick={() => setAction(a.value)}
+              onClick={() => setAction(action === a.value ? null : a.value)}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all',
                 isActive
