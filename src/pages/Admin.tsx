@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Settings, Zap, ZapOff, Play, RefreshCw } from 'lucide-react'
+import { Zap, ZapOff, Play, RefreshCw } from 'lucide-react'
 import { dhub, supabase } from '../lib/supabase'
 
 const EXECUTE_FUNCTION_URL = 'https://nhwdgstjhugezhqlktie.supabase.co/functions/v1/dhub-execute-decision'
