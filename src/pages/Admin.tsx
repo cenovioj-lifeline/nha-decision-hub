@@ -135,13 +135,13 @@ export default function Admin() {
             <button
               onClick={toggleClickup}
               disabled={toggling}
-              className={`relative w-12 h-7 rounded-full transition-colors ${
+              className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors ${
                 clickupEnabled ? 'bg-green-500' : 'bg-nha-gray-300'
               }`}
             >
               <span
-                className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${
-                  clickupEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                className={`inline-block h-6 w-6 rounded-full bg-white shadow-md transition-transform ${
+                  clickupEnabled ? 'translate-x-7' : 'translate-x-1'
                 }`}
               />
             </button>
