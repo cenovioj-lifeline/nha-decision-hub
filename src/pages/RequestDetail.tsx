@@ -70,9 +70,18 @@ export default function RequestDetail() {
   // Editable fields
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [editingEmail, setEditingEmail] = useState(false)
+  const [emailDraft, setEmailDraft] = useState('')
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [descDraft, setDescDraft] = useState('')
   const [poNotes, setPoNotes] = useState('')
   const [poNotesSaved, setPoNotesSaved] = useState(false)
   const titleInputRef = useRef<HTMLInputElement>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const emailInputRef = useRef<HTMLInputElement>(null)
+  const descTextareaRef = useRef<HTMLTextAreaElement>(null)
   const poNotesTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const CATEGORIES = ['bug', 'feature', 'ux', 'question', 'data']
@@ -94,6 +103,49 @@ export default function RequestDetail() {
     setEditingTitle(false)
     await updateField('title', titleDraft.trim())
     setRequest({ ...request, title: titleDraft.trim() })
+  }
+
+  function handleNameEdit() {
+    if (!request) return
+    setNameDraft(request.requester_name)
+    setEditingName(true)
+    setTimeout(() => nameInputRef.current?.focus(), 50)
+  }
+
+  async function handleNameSave() {
+    if (!request || !nameDraft.trim()) return
+    setEditingName(false)
+    await updateField('requester_name', nameDraft.trim())
+    setRequest({ ...request, requester_name: nameDraft.trim() })
+  }
+
+  function handleEmailEdit() {
+    if (!request) return
+    setEmailDraft(request.requester_email || '')
+    setEditingEmail(true)
+    setTimeout(() => emailInputRef.current?.focus(), 50)
+  }
+
+  async function handleEmailSave() {
+    if (!request) return
+    setEditingEmail(false)
+    const val = emailDraft.trim() || null
+    await updateField('requester_email', val)
+    setRequest({ ...request, requester_email: val })
+  }
+
+  function handleDescEdit() {
+    if (!request) return
+    setDescDraft(request.description || '')
+    setEditingDesc(true)
+    setTimeout(() => descTextareaRef.current?.focus(), 50)
+  }
+
+  async function handleDescSave() {
+    if (!request) return
+    setEditingDesc(false)
+    await updateField('description', descDraft)
+    setRequest({ ...request, description: descDraft })
   }
 
   async function handleCategoryChange(newCat: string) {
@@ -247,12 +299,41 @@ export default function RequestDetail() {
                   <StatusBadge value={request.status} />
                 </div>
                 <div className="flex items-center gap-2 text-sm text-nha-gray-500 flex-wrap">
-                  <span>{request.requester_name}</span>
-                  {request.requester_email && (
-                    <>
-                      <span className="text-nha-gray-300">|</span>
-                      <span>{request.requester_email}</span>
-                    </>
+                  {!isViewer && editingName ? (
+                    <input
+                      ref={nameInputRef}
+                      value={nameDraft}
+                      onChange={e => setNameDraft(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleNameSave(); if (e.key === 'Escape') setEditingName(false) }}
+                      onBlur={handleNameSave}
+                      className="text-sm text-nha-gray-500 bg-transparent border-b-2 border-nha-blue outline-none"
+                    />
+                  ) : (
+                    <span
+                      className={!isViewer ? 'cursor-pointer hover:text-nha-blue transition-colors' : ''}
+                      onClick={!isViewer ? handleNameEdit : undefined}
+                    >
+                      {request.requester_name}
+                    </span>
+                  )}
+                  <span className="text-nha-gray-300">|</span>
+                  {!isViewer && editingEmail ? (
+                    <input
+                      ref={emailInputRef}
+                      value={emailDraft}
+                      onChange={e => setEmailDraft(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleEmailSave(); if (e.key === 'Escape') setEditingEmail(false) }}
+                      onBlur={handleEmailSave}
+                      placeholder="email@example.com"
+                      className="text-sm text-nha-gray-500 bg-transparent border-b-2 border-nha-blue outline-none"
+                    />
+                  ) : (
+                    <span
+                      className={!isViewer ? 'cursor-pointer hover:text-nha-blue transition-colors' : ''}
+                      onClick={!isViewer ? handleEmailEdit : undefined}
+                    >
+                      {request.requester_email || (isViewer ? '' : 'Add email')}
+                    </span>
                   )}
                   <span className="text-nha-gray-300">|</span>
                   <span>{timeAgo(request.created_at)}</span>
@@ -326,13 +407,34 @@ export default function RequestDetail() {
             ) : null}
 
             {/* Description */}
-            {request.description ? (
-              <div className="prose prose-sm max-w-none text-nha-gray-700 whitespace-pre-wrap">
+            {!isViewer && editingDesc ? (
+              <div>
+                <textarea
+                  ref={descTextareaRef}
+                  value={descDraft}
+                  onChange={e => setDescDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Escape') setEditingDesc(false) }}
+                  rows={10}
+                  className="w-full text-sm text-nha-gray-700 bg-transparent border-2 border-nha-blue rounded-lg px-3 py-2 outline-none resize-y"
+                />
+                <div className="flex gap-2 mt-2">
+                  <button onClick={handleDescSave} className="text-sm text-white bg-nha-blue px-3 py-1 rounded-lg hover:bg-nha-blue/90">Save</button>
+                  <button onClick={() => setEditingDesc(false)} className="text-sm text-nha-gray-500 px-3 py-1 rounded-lg hover:bg-nha-gray-100">Cancel</button>
+                </div>
+              </div>
+            ) : request.description ? (
+              <div
+                className={`prose prose-sm max-w-none text-nha-gray-700 whitespace-pre-wrap ${!isViewer ? 'cursor-pointer hover:bg-nha-gray-50 rounded-lg transition-colors -mx-2 px-2 py-1' : ''}`}
+                onClick={!isViewer ? handleDescEdit : undefined}
+              >
                 {request.description}
               </div>
             ) : (
-              <div className="text-sm text-nha-gray-400 italic">
-                No text content — this message may have been an image or attachment only.
+              <div
+                className={`text-sm text-nha-gray-400 italic ${!isViewer ? 'cursor-pointer hover:text-nha-blue' : ''}`}
+                onClick={!isViewer ? handleDescEdit : undefined}
+              >
+                {isViewer ? 'No text content — this message may have been an image or attachment only.' : 'Click to add description...'}
               </div>
             )}
 
