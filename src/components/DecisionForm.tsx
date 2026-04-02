@@ -101,12 +101,16 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
     setSubmitting(true)
     setError('')
     try {
-      await dhub.from('decisions').delete().eq('request_id', requestId)
-      await dhub.from('requests').update({
+      const { error: deleteError } = await dhub.from('decisions').delete().eq('request_id', requestId)
+      if (deleteError) throw deleteError
+
+      const { error: updateError } = await dhub.from('requests').update({
         status: 'new',
         consolidated_into: null,
         updated_at: new Date().toISOString(),
       }).eq('id', requestId)
+      if (updateError) throw updateError
+
       onDecided()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to clear')
@@ -125,7 +129,8 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
 
       // If there's an existing decision, delete it first
       if (existingDecision) {
-        await dhub.from('decisions').delete().eq('request_id', requestId)
+        const { error: delErr } = await dhub.from('decisions').delete().eq('request_id', requestId)
+        if (delErr) throw delErr
       }
 
       const autoExecute = action === 'decline' || action === 'on_hold' || action === 'merge'

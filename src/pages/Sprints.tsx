@@ -69,6 +69,8 @@ export default function Sprints() {
           if (!sprintId) continue
           const req = Array.isArray(d.requests) ? d.requests[0] : d.requests
           if (!req) continue
+          // Only show tasks whose request is still approved
+          if (req.status !== 'approved') continue
           if (!grouped[sprintId]) grouped[sprintId] = []
           grouped[sprintId].push({
             request_id: d.request_id,
@@ -225,7 +227,7 @@ export default function Sprints() {
                               </div>
                             </div>
                             <div className="text-right shrink-0">
-                              {task.cenovio_estimate != null ? (
+                              {task.cenovio_estimate ? (
                                 <span className="text-sm font-semibold text-nha-gray-700">
                                   {task.cenovio_estimate}h
                                 </span>

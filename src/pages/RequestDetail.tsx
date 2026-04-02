@@ -135,6 +135,8 @@ export default function RequestDetail() {
       const decRes = await dhub.from('decisions').select('*, sprints(label)').eq('request_id', id).order('decided_at', { ascending: false }).limit(1)
       if (decRes.data && (decRes.data as Decision[]).length > 0) {
         setDecision((decRes.data as Decision[])[0])
+      } else {
+        setDecision(null)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error loading request')
