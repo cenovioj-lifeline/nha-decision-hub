@@ -452,6 +452,7 @@ export default function RequestDetail() {
                   sprint_id: decision.sprint_id,
                   cenovio_estimate: decision.cenovio_estimate,
                 } : null}
+                aiEstimate={request.dev_estimate_hours}
                 onDecided={fetchData}
               />
               {decision?.clickup_task_url && (

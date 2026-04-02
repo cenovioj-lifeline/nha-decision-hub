@@ -27,6 +27,7 @@ interface DecisionFormProps {
   requestId: string
   currentStatus: string
   existingDecision?: ExistingDecision | null
+  aiEstimate?: number | null
   onDecided: () => void
 }
 
@@ -39,7 +40,7 @@ const ACTIONS: { value: Action; label: string; icon: typeof Check; color: string
 
 const PRIORITIES = ['urgent', 'high', 'normal', 'low']
 
-export default function DecisionForm({ requestId, currentStatus: _status, existingDecision, onDecided }: DecisionFormProps) {
+export default function DecisionForm({ requestId, currentStatus: _status, existingDecision, aiEstimate, onDecided }: DecisionFormProps) {
   const { user } = useAuth()
 
   // Derive the "saved" action from the existing decision
@@ -142,7 +143,8 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
       if (action === 'approve') {
         decision.priority = priority
         if (sprintId) decision.sprint_id = sprintId
-        if (cenovioEstimate) decision.cenovio_estimate = parseFloat(cenovioEstimate)
+        const estimate = cenovioEstimate ? parseFloat(cenovioEstimate) : aiEstimate ?? null
+        if (estimate != null) decision.cenovio_estimate = estimate
       }
 
       if (action === 'merge' && mergeTargetId) {
@@ -366,7 +368,7 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
                 step="0.5"
                 value={cenovioEstimate}
                 onChange={(e) => setCenovioEstimate(e.target.value)}
-                placeholder="0"
+                placeholder={aiEstimate != null ? String(aiEstimate) : '0'}
                 className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nha-sky focus:border-nha-sky"
               />
             </div>
