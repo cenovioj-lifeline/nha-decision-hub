@@ -107,6 +107,7 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
       const { error: updateError } = await dhub.from('requests').update({
         status: 'new',
         consolidated_into: null,
+        ai_analyzed_at: null,
         updated_at: new Date().toISOString(),
       }).eq('id', requestId)
       if (updateError) throw updateError
