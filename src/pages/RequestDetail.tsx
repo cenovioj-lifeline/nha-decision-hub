@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Clock, ExternalLink, Image, Layers, Mail, MessageSquare, Paperclip, Pencil, Reply, X } from 'lucide-react'
-import { dhub } from '../lib/supabase'
+import { ArrowLeft, Check, Clock, ExternalLink, Image, Layers, Mail, MessageCircleQuestion, MessageSquare, Paperclip, Pencil, Reply, Send, X } from 'lucide-react'
+import { dhub, supabase } from '../lib/supabase'
 import { timeAgo, formatDateTime } from '../lib/utils'
 import { useAuth } from '../lib/auth'
 import CategoryIcon from '../components/CategoryIcon'
@@ -83,6 +83,55 @@ export default function RequestDetail() {
   const emailInputRef = useRef<HTMLInputElement>(null)
   const descTextareaRef = useRef<HTMLTextAreaElement>(null)
   const poNotesTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  // Clarification state
+  const [clarificationMsg, setClarificationMsg] = useState('')
+  const [clarificationSending, setClarificationSending] = useState(false)
+  const [clarificationResult, setClarificationResult] = useState('')
+  const [clarifications, setClarifications] = useState<{ message_text: string; created_at: string }[]>([])
+
+  async function fetchClarifications() {
+    if (!id) return
+    const { data } = await dhub
+      .from('communications')
+      .select('message_text, created_at')
+      .eq('request_id', id)
+      .eq('message_type', 'clarification')
+      .order('created_at', { ascending: true })
+    setClarifications((data as { message_text: string; created_at: string }[]) ?? [])
+  }
+
+  async function sendClarification() {
+    if (!clarificationMsg.trim() || !id) return
+    setClarificationSending(true)
+    setClarificationResult('')
+    try {
+      const res = await fetch(
+        'https://nhwdgstjhugezhqlktie.supabase.co/functions/v1/dhub-send-clarification',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ''}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ request_id: id, message: clarificationMsg }),
+        }
+      )
+      const data = await res.json()
+      if (data.error) {
+        setClarificationResult(`Failed: ${data.error}`)
+      } else {
+        setClarificationResult(`Sent to ${data.recipient} via Slack`)
+        setClarificationMsg('')
+        fetchClarifications()
+      }
+    } catch (err) {
+      setClarificationResult(`Error: ${err instanceof Error ? err.message : 'Unknown'}`)
+    } finally {
+      setClarificationSending(false)
+      setTimeout(() => setClarificationResult(''), 5000)
+    }
+  }
 
   const CATEGORIES = ['bug', 'feature', 'ux', 'question', 'data']
 
@@ -198,6 +247,7 @@ export default function RequestDetail() {
 
   useEffect(() => {
     fetchData()
+    fetchClarifications()
   }, [id])
 
   if (loading) {
@@ -405,6 +455,49 @@ export default function RequestDetail() {
                 <p className="text-sm text-nha-gray-700 whitespace-pre-wrap">{poNotes}</p>
               </div>
             ) : null}
+
+            {/* Ask for Clarification */}
+            {!isViewer && (
+              <div className="mb-4">
+                <label className="block text-xs font-bold uppercase tracking-wider text-nha-gray-400 mb-2 flex items-center gap-1.5">
+                  <MessageCircleQuestion size={12} />
+                  Ask for Clarification
+                </label>
+                {clarifications.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {clarifications.map((c, i) => (
+                      <div key={i} className="flex gap-2 text-sm">
+                        <span className="text-nha-gray-400 whitespace-nowrap text-xs mt-0.5">{formatDateTime(c.created_at)}</span>
+                        <p className="text-nha-gray-600 bg-nha-gray-50 rounded-lg px-3 py-1.5 border border-nha-gray-100">{c.message_text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <textarea
+                    value={clarificationMsg}
+                    onChange={e => setClarificationMsg(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendClarification() }}
+                    rows={2}
+                    placeholder={`Ask ${request.requester_name.split(' ')[0]} a question via Slack DM...`}
+                    className="flex-1 rounded-lg border border-nha-gray-200 px-3 py-2 text-sm text-nha-gray-700 focus:outline-none focus:ring-2 focus:ring-nha-blue/20 focus:border-nha-blue resize-none"
+                  />
+                  <button
+                    onClick={sendClarification}
+                    disabled={clarificationSending || !clarificationMsg.trim()}
+                    className="self-end px-3 py-2 bg-nha-blue text-white rounded-lg text-sm font-medium hover:bg-nha-blue/90 transition-colors disabled:opacity-40 flex items-center gap-1.5"
+                  >
+                    <Send size={14} />
+                    {clarificationSending ? 'Sending...' : 'Send'}
+                  </button>
+                </div>
+                {clarificationResult && (
+                  <p className={`text-xs mt-1.5 ${clarificationResult.startsWith('Failed') || clarificationResult.startsWith('Error') ? 'text-red-600' : 'text-green-600'}`}>
+                    {clarificationResult}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Description */}
             {!isViewer && editingDesc ? (
