@@ -382,24 +382,25 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
             </div>
           </div>
 
-          <label className="flex items-center gap-2.5 cursor-pointer group">
-            <input
-              type="checkbox"
-              checked={dhubTask}
-              onChange={(e) => setDhubTask(e.target.checked)}
-              className="w-4 h-4 rounded border-nha-gray-300 text-nha-blue focus:ring-nha-blue/20 cursor-pointer"
-            />
-            <span className="text-sm text-nha-gray-700 group-hover:text-nha-gray-900 transition-colors">
-              Decision Hub task
-            </span>
-            {!dhubTask && (
-              <span className="text-xs text-nha-gray-400">
-                — will create a plain ClickUp task without sprint tag or custom fields
-              </span>
-            )}
-          </label>
         </div>
       )}
+
+      <label className="flex items-center gap-2.5 cursor-pointer group">
+        <input
+          type="checkbox"
+          checked={dhubTask}
+          onChange={(e) => setDhubTask(e.target.checked)}
+          className="w-4 h-4 rounded border-nha-gray-300 text-nha-blue focus:ring-nha-blue/20 cursor-pointer"
+        />
+        <span className="text-sm text-nha-gray-700 group-hover:text-nha-gray-900 transition-colors">
+          Decision Hub task
+        </span>
+        {!dhubTask && (
+          <span className="text-xs text-nha-gray-400">
+            — ClickUp task will be created without sprint tag or custom fields
+          </span>
+        )}
+      </label>
 
       <div>
         <label className="block text-sm font-medium text-nha-gray-700 mb-1">Notes</label>
