@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Inbox as InboxIcon, RefreshCw, Clock, Sparkles } from 'lucide-react'
+import { Inbox as InboxIcon, RefreshCw, Clock, Sparkles, User } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import RequestCard from '../components/RequestCard'
@@ -25,6 +25,7 @@ export default function Inbox() {
   const [error, setError] = useState('')
   const [processing, setProcessing] = useState(false)
   const [processResult, setProcessResult] = useState('')
+  const [requesterFilter, setRequesterFilter] = useState<string>('All')
 
   async function fetchRequests() {
     setLoading(true)
@@ -136,30 +137,78 @@ export default function Inbox() {
         </div>
       )}
 
+      {requests.length > 0 && (() => {
+        const counts = requests.reduce<Record<string, number>>((acc, r) => {
+          acc[r.requester_name] = (acc[r.requester_name] || 0) + 1
+          return acc
+        }, {})
+        const names = Object.keys(counts).sort((a, b) => a.localeCompare(b))
+        if (names.length <= 1) return null
+        return (
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <User size={14} className="text-nha-gray-400 shrink-0" />
+            <button
+              onClick={() => setRequesterFilter('All')}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                requesterFilter === 'All'
+                  ? 'bg-nha-blue-600 text-white'
+                  : 'bg-nha-gray-100 text-nha-gray-600 hover:bg-nha-gray-200'
+              }`}
+            >
+              All ({requests.length})
+            </button>
+            {names.map((name) => (
+              <button
+                key={name}
+                onClick={() => setRequesterFilter(name)}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                  requesterFilter === name
+                    ? 'bg-nha-blue-600 text-white'
+                    : 'bg-nha-gray-100 text-nha-gray-600 hover:bg-nha-gray-200'
+                }`}
+              >
+                {name} ({counts[name]})
+              </button>
+            ))}
+          </div>
+        )
+      })()}
+
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
           <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
 
-      {loading && requests.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-nha-gray-400">
-          <RefreshCw size={24} className="animate-spin mb-3" />
-          <p className="text-sm">Loading requests...</p>
-        </div>
-      ) : requests.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-nha-gray-400">
-          <InboxIcon size={48} className="mb-3" />
-          <p className="text-lg font-medium text-nha-gray-600">Inbox is empty</p>
-          <p className="text-sm mt-1">All requests have been processed</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {requests.map((request) => (
-            <RequestCard key={request.id} request={request} />
-          ))}
-        </div>
-      )}
+      {(() => {
+        const filtered = requesterFilter === 'All'
+          ? requests
+          : requests.filter((r) => r.requester_name === requesterFilter)
+        if (loading && requests.length === 0) {
+          return (
+            <div className="flex flex-col items-center justify-center py-20 text-nha-gray-400">
+              <RefreshCw size={24} className="animate-spin mb-3" />
+              <p className="text-sm">Loading requests...</p>
+            </div>
+          )
+        }
+        if (requests.length === 0) {
+          return (
+            <div className="flex flex-col items-center justify-center py-20 text-nha-gray-400">
+              <InboxIcon size={48} className="mb-3" />
+              <p className="text-lg font-medium text-nha-gray-600">Inbox is empty</p>
+              <p className="text-sm mt-1">All requests have been processed</p>
+            </div>
+          )
+        }
+        return (
+          <div className="space-y-3">
+            {filtered.map((request) => (
+              <RequestCard key={request.id} request={request} />
+            ))}
+          </div>
+        )
+      })()}
     </div>
   )
 }
