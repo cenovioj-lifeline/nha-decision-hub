@@ -44,8 +44,8 @@ export default function Dashboard() {
         dhub.from('decisions').select('id', { count: 'exact', head: true }).gte('decided_at', weekAgo),
         dhub.from('requests').select('id', { count: 'exact', head: true }).eq('status', 'tracking'),
         dhub.from('requests').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
-        dhub.from('requests').select('category').neq('status', 'consolidated'),
-        dhub.from('requests').select('id, title, category, status, updated_at').neq('status', 'consolidated').order('updated_at', { ascending: false }).limit(8),
+        dhub.from('requests').select('category').not('status', 'in', '("consolidated","raw")').is('consolidated_into', null),
+        dhub.from('requests').select('id, title, category, status, updated_at').not('status', 'in', '("consolidated","raw")').is('consolidated_into', null).order('updated_at', { ascending: false }).limit(8),
       ])
 
       setStats({

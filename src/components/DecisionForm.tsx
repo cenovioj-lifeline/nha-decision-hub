@@ -79,7 +79,7 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
       const { data } = await dhub
         .from('requests')
         .select('id, title, requester_name')
-        .in('status', ['new', 'inbox'])
+        .eq('status', 'new')
         .neq('id', requestId)
         .order('created_at', { ascending: false })
       if (data) setMergeTargets(data as { id: string; title: string; requester_name: string }[])
