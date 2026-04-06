@@ -16,21 +16,31 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const ADMIN_EMAIL = 'cjaimes@nhaschools.com'
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [isViewer, setIsViewer] = useState(() => sessionStorage.getItem('dhub_viewer') === '1')
 
-  const isAdmin = user?.email === ADMIN_EMAIL
+  async function checkAdmin(email: string | undefined) {
+    if (!email) { setIsAdmin(false); return }
+    const { data } = await supabase
+      .from('allowed_users')
+      .select('is_admin')
+      .eq('email', email.toLowerCase())
+      .single()
+    setIsAdmin(data?.is_admin === true)
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s)
       setUser(s?.user ?? null)
-      if (s?.user) setIsViewer(false)
+      if (s?.user) {
+        setIsViewer(false)
+        checkAdmin(s.user.email)
+      }
       setLoading(false)
     })
 
@@ -40,6 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (s?.user) {
         setIsViewer(false)
         sessionStorage.removeItem('dhub_viewer')
+        checkAdmin(s.user.email)
+      } else {
+        setIsAdmin(false)
       }
     })
 
