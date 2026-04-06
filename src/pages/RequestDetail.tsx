@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Clock, ExternalLink, Image, Layers, Mail, MessageCircleQuestion, MessageSquare, Paperclip, Pencil, Reply, Send, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, Clock, ExternalLink, Image, Layers, Mail, MessageCircleQuestion, MessageSquare, Paperclip, Pencil, Reply, Send, X } from 'lucide-react'
 import { dhub, supabase } from '../lib/supabase'
 import { timeAgo, formatDateTime } from '../lib/utils'
 import { useAuth } from '../lib/auth'
@@ -42,6 +42,10 @@ interface Request {
       has_attachment: boolean
     }[]
     consolidation_reasoning?: string
+    consolidation_note?: string
+    needs_clarification?: boolean
+    clarification_questions?: string[]
+    clarification_answers?: { question: string; answer: string }[]
   } | null
 }
 
@@ -89,6 +93,50 @@ export default function RequestDetail() {
   const [clarificationSending, setClarificationSending] = useState(false)
   const [clarificationResult, setClarificationResult] = useState('')
   const [clarifications, setClarifications] = useState<{ message_text: string; created_at: string }[]>([])
+
+  // AI clarification Q&A state
+  const [clarificationDrafts, setClarificationDrafts] = useState<Record<number, string>>({})
+  const [clarificationSaving, setClarificationSaving] = useState(false)
+  const [clarificationSaveResult, setClarificationSaveResult] = useState('')
+
+  async function handleSaveClarificationAnswers() {
+    if (!request || !id) return
+    setClarificationSaving(true)
+    setClarificationSaveResult('')
+
+    const questions = request.metadata?.clarification_questions ?? []
+    const answers = questions.map((q: string, i: number) => ({
+      question: q,
+      answer: (clarificationDrafts[i] ?? '').trim(),
+    }))
+
+    const unanswered = answers.filter((a: { answer: string }) => !a.answer)
+    if (unanswered.length > 0) {
+      setClarificationSaveResult('Please answer all questions before saving.')
+      setClarificationSaving(false)
+      return
+    }
+
+    const updatedMetadata = {
+      ...request.metadata,
+      needs_clarification: false,
+      clarification_answers: answers,
+    }
+
+    const { error: saveErr } = await dhub.from('requests').update({
+      metadata: updatedMetadata,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)
+
+    if (saveErr) {
+      setClarificationSaveResult(`Error: ${saveErr.message}`)
+    } else {
+      setClarificationSaveResult('Answers saved — this request is now complete.')
+      setRequest({ ...request, metadata: updatedMetadata } as Request)
+      setTimeout(() => setClarificationSaveResult(''), 5000)
+    }
+    setClarificationSaving(false)
+  }
 
   async function fetchClarifications() {
     if (!id) return
@@ -455,6 +503,74 @@ export default function RequestDetail() {
                 <p className="text-sm text-nha-gray-700 whitespace-pre-wrap">{poNotes}</p>
               </div>
             ) : null}
+
+            {/* AI Clarification Q&A */}
+            {request.metadata?.clarification_questions && request.metadata.clarification_questions.length > 0 && (
+              <div className={`rounded-xl border p-4 mb-4 ${
+                request.metadata.needs_clarification
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-green-50 border-green-200'
+              }`}>
+                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-3">
+                  {request.metadata.needs_clarification ? (
+                    <>
+                      <AlertTriangle size={12} className="text-amber-600" />
+                      <span className="text-amber-700">More Details Needed</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={14} className="text-green-600" />
+                      <span className="text-green-700">Details Provided</span>
+                    </>
+                  )}
+                </h3>
+
+                {request.metadata.needs_clarification ? (
+                  <>
+                    <p className="text-sm text-amber-700 mb-4">
+                      This request needs more detail before a developer can act on it. Please answer the questions below:
+                    </p>
+                    <div className="space-y-4">
+                      {request.metadata.clarification_questions.map((question: string, i: number) => (
+                        <div key={i}>
+                          <label className="block text-sm font-medium text-nha-gray-700 mb-1">
+                            {i + 1}. {question}
+                          </label>
+                          <textarea
+                            value={clarificationDrafts[i] ?? ''}
+                            onChange={e => setClarificationDrafts(prev => ({ ...prev, [i]: e.target.value }))}
+                            rows={2}
+                            placeholder="Type your answer..."
+                            className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-nha-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 resize-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={handleSaveClarificationAnswers}
+                      disabled={clarificationSaving}
+                      className="mt-4 px-4 py-2 bg-nha-blue text-white rounded-lg text-sm font-medium hover:bg-nha-blue/90 transition-colors disabled:opacity-40"
+                    >
+                      {clarificationSaving ? 'Saving...' : 'Save Answers'}
+                    </button>
+                    {clarificationSaveResult && (
+                      <p className={`text-xs mt-2 ${clarificationSaveResult.startsWith('Error') ? 'text-red-600' : clarificationSaveResult.startsWith('Please') ? 'text-amber-600' : 'text-green-600'}`}>
+                        {clarificationSaveResult}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    {request.metadata.clarification_answers?.map((qa: { question: string; answer: string }, i: number) => (
+                      <div key={i} className="bg-white rounded-lg border border-green-100 p-3">
+                        <p className="text-xs font-medium text-nha-gray-500 mb-1">Q: {qa.question}</p>
+                        <p className="text-sm text-nha-gray-700">{qa.answer}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Ask for Clarification */}
             {!isViewer && (

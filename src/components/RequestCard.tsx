@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Clock, Layers, Mail, MessageSquare } from 'lucide-react'
+import { AlertTriangle, Clock, Layers, Mail, MessageSquare } from 'lucide-react'
 import CategoryIcon from './CategoryIcon'
 import StatusBadge from './StatusBadge'
 import { timeAgo } from '../lib/utils'
@@ -18,6 +18,8 @@ interface Request {
   metadata: {
     is_consolidated?: boolean
     source_count?: number
+    needs_clarification?: boolean
+    clarification_answers?: { question: string; answer: string }[]
   } | null
 }
 
@@ -34,7 +36,7 @@ export default function RequestCard({ request }: RequestCardProps) {
   const navigate = useNavigate()
   const analysis = request.ai_analysis as { summary?: string } | null
   const SourceIcon = SOURCE_ICONS[request.source]
-  const meta = request.metadata as { is_consolidated?: boolean; source_count?: number } | null
+  const meta = request.metadata as { is_consolidated?: boolean; source_count?: number; needs_clarification?: boolean; clarification_answers?: unknown[] } | null
   const isConsolidated = meta?.is_consolidated === true
   const sourceCount = meta?.source_count ?? 1
 
@@ -76,6 +78,15 @@ export default function RequestCard({ request }: RequestCardProps) {
                 <Layers size={10} />
                 {sourceCount} messages
               </span>
+            )}
+            {meta?.needs_clarification && !meta?.clarification_answers?.length && (
+              <>
+                <span className="text-nha-gray-300">|</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                  <AlertTriangle size={10} />
+                  Needs details
+                </span>
+              </>
             )}
           </div>
           {analysis?.summary ? (

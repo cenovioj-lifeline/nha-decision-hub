@@ -12,6 +12,7 @@ import {
   Calendar,
   Eye,
   Settings,
+  BookOpen,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { cn } from '../lib/utils'
@@ -28,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/sprints', label: 'Sprints', icon: Calendar, adminOnly: true },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
   { to: '/requests', label: 'Requests & Decisions', icon: FileText },
+  { to: '/guide', label: 'Submission Guide', icon: BookOpen },
   { to: '/admin', label: 'Admin', icon: Settings, adminOnly: true },
 ]
 

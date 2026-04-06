@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Inbox as InboxIcon, RefreshCw, Clock, Sparkles, ChevronDown, Check } from 'lucide-react'
+import { Inbox as InboxIcon, RefreshCw, Clock, Sparkles, ChevronDown, Check, AlertTriangle } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import RequestCard from '../components/RequestCard'
@@ -27,6 +27,7 @@ export default function Inbox() {
   const [processResult, setProcessResult] = useState('')
   const [selectedRequesters, setSelectedRequesters] = useState<Set<string>>(new Set())
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [showNeedsClarification, setShowNeedsClarification] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   async function fetchRequests() {
@@ -94,10 +95,20 @@ export default function Inbox() {
   }, [])
 
   const requesterNames = [...new Set(requests.map(r => r.requester_name))].sort()
+  const needsClarificationCount = requests.filter(r => {
+    const meta = r.metadata as Record<string, unknown> | null
+    return meta?.needs_clarification === true && !(meta?.clarification_answers as unknown[])?.length
+  }).length
   const isFiltered = selectedRequesters.size > 0 && selectedRequesters.size < requesterNames.length
-  const filtered = isFiltered
+  const afterRequesterFilter = isFiltered
     ? requests.filter(r => selectedRequesters.has(r.requester_name))
     : requests
+  const filtered = showNeedsClarification
+    ? afterRequesterFilter.filter(r => {
+        const meta = r.metadata as Record<string, unknown> | null
+        return meta?.needs_clarification === true && !(meta?.clarification_answers as unknown[])?.length
+      })
+    : afterRequesterFilter
 
   function toggleRequester(name: string) {
     setSelectedRequesters(prev => {
@@ -121,9 +132,12 @@ export default function Inbox() {
         <div>
           <h1 className="text-2xl font-bold text-nha-gray-900">Inbox</h1>
           <p className="text-sm text-nha-gray-500 mt-1">
-            {isFiltered
+            {isFiltered || showNeedsClarification
               ? `${filtered.length} of ${requests.length} requests (filtered)`
               : `${requests.length} request${requests.length !== 1 ? 's' : ''} awaiting decision`}
+            {needsClarificationCount > 0 && !showNeedsClarification && (
+              <span className="text-amber-600"> · {needsClarificationCount} need{needsClarificationCount === 1 ? 's' : ''} details</span>
+            )}
           </p>
         </div>
         {(() => {
@@ -174,8 +188,25 @@ export default function Inbox() {
         </div>
       )}
 
+      {requests.length > 0 && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap" ref={dropdownRef}>
+          {needsClarificationCount > 0 && (
+            <button
+              onClick={() => setShowNeedsClarification(prev => !prev)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${
+                showNeedsClarification
+                  ? 'border-amber-300 bg-amber-50 text-amber-700'
+                  : 'border-nha-gray-200 text-nha-gray-600 hover:bg-nha-gray-50'
+              }`}
+            >
+              <AlertTriangle size={14} />
+              Needs details ({needsClarificationCount})
+            </button>
+          )}
+        </div>
+      )}
       {requests.length > 0 && requesterNames.length > 1 && (
-        <div className="relative mb-4" ref={dropdownRef}>
+        <div className="relative mb-4">
           <button
             onClick={() => setDropdownOpen(o => !o)}
             className="flex items-center gap-2 px-3 py-2 rounded-lg border border-nha-gray-200 text-sm text-nha-gray-700 hover:bg-nha-gray-50 transition-colors"

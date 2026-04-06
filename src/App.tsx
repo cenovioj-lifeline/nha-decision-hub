@@ -9,6 +9,7 @@ import RequestDetail from './pages/RequestDetail'
 import RequestsAndDecisions from './pages/MyRequests'
 import Sprints from './pages/Sprints'
 import Dashboard from './pages/Dashboard'
+import Guide from './pages/Guide'
 import Admin from './pages/Admin'
 
 function RootRedirect() {
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/dashboard" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
             <Route path="/requests" element={<RequestsAndDecisions />} />
+            <Route path="/guide" element={<Guide />} />
             {/* Legacy redirects */}
             <Route path="/my-requests" element={<Navigate to="/requests" replace />} />
             <Route path="/decisions" element={<Navigate to="/requests" replace />} />
