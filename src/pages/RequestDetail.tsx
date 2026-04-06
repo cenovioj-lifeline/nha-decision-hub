@@ -44,8 +44,8 @@ interface Request {
     consolidation_reasoning?: string
     consolidation_note?: string
     needs_clarification?: boolean
-    clarification_questions?: string[]
-    clarification_answers?: { question: string; answer: string }[]
+    clarification_questions?: (string | { question: string; for: string; for_email: string })[]
+    clarification_answers?: { question: string; for: string; for_email: string; answer: string; bypassed?: boolean }[]
   } | null
 }
 
@@ -94,33 +94,74 @@ export default function RequestDetail() {
   const [clarificationResult, setClarificationResult] = useState('')
   const [clarifications, setClarifications] = useState<{ message_text: string; created_at: string }[]>([])
 
-  // AI clarification Q&A state
-  const [clarificationDrafts, setClarificationDrafts] = useState<Record<number, string>>({})
-  const [clarificationSaving, setClarificationSaving] = useState(false)
+  // AI clarification Q&A state (per-person)
+  const [clarificationDrafts, setClarificationDrafts] = useState<Record<string, string>>({})
+  const [clarificationSaving, setClarificationSaving] = useState<string | null>(null)
   const [clarificationSaveResult, setClarificationSaveResult] = useState('')
 
-  async function handleSaveClarificationAnswers() {
+  // Helper types for per-person questions
+  type ClarificationQ = { question: string; for: string; for_email: string }
+  type ClarificationA = { question: string; for: string; for_email: string; answer: string; bypassed?: boolean }
+
+  function getClarificationQuestions(): ClarificationQ[] {
+    const raw = request?.metadata?.clarification_questions
+    if (!Array.isArray(raw)) return []
+    // Handle both old format (string[]) and new format (object[])
+    return raw.map((q: unknown) => {
+      if (typeof q === 'string') return { question: q, for: request?.requester_name ?? 'Unknown', for_email: request?.requester_email ?? '' }
+      return q as ClarificationQ
+    })
+  }
+
+  function getClarificationAnswers(): ClarificationA[] {
+    return (request?.metadata?.clarification_answers ?? []) as ClarificationA[]
+  }
+
+  function getPersonsWithQuestions(): string[] {
+    const questions = getClarificationQuestions()
+    const answers = getClarificationAnswers()
+    const answeredKeys = new Set(answers.map(a => `${a.for}::${a.question}`))
+    const persons = new Set<string>()
+    for (const q of questions) {
+      if (!answeredKeys.has(`${q.for}::${q.question}`)) persons.add(q.for)
+    }
+    return [...persons].sort()
+  }
+
+  async function handleSaveForPerson(personName: string) {
     if (!request || !id) return
-    setClarificationSaving(true)
+    setClarificationSaving(personName)
     setClarificationSaveResult('')
 
-    const questions = request.metadata?.clarification_questions ?? []
-    const answers = questions.map((q: string, i: number) => ({
-      question: q,
-      answer: (clarificationDrafts[i] ?? '').trim(),
+    const allQuestions = getClarificationQuestions()
+    const existingAnswers = getClarificationAnswers()
+    const personQuestions = allQuestions.filter(q => q.for === personName)
+
+    const newAnswers: ClarificationA[] = personQuestions.map((q, i) => ({
+      ...q,
+      answer: (clarificationDrafts[`${personName}::${i}`] ?? '').trim(),
     }))
 
-    const unanswered = answers.filter((a: { answer: string }) => !a.answer)
+    const unanswered = newAnswers.filter(a => !a.answer)
     if (unanswered.length > 0) {
-      setClarificationSaveResult('Please answer all questions before saving.')
-      setClarificationSaving(false)
+      setClarificationSaveResult(`Please answer all questions before saving.`)
+      setClarificationSaving(null)
       return
     }
 
+    // Merge with existing answers from other people
+    const otherAnswers = existingAnswers.filter(a => a.for !== personName)
+    const allAnswers = [...otherAnswers, ...newAnswers]
+
+    // Check if ALL people have now answered
+    const allPersons = [...new Set(allQuestions.map(q => q.for))]
+    const answeredPersons = new Set(allAnswers.map(a => a.for))
+    const allDone = allPersons.every(p => answeredPersons.has(p))
+
     const updatedMetadata = {
       ...request.metadata,
-      needs_clarification: false,
-      clarification_answers: answers,
+      needs_clarification: !allDone,
+      clarification_answers: allAnswers,
     }
 
     const { error: saveErr } = await dhub.from('requests').update({
@@ -131,11 +172,53 @@ export default function RequestDetail() {
     if (saveErr) {
       setClarificationSaveResult(`Error: ${saveErr.message}`)
     } else {
-      setClarificationSaveResult('Answers saved — this request is now complete.')
+      setClarificationSaveResult(allDone ? 'All answers saved — request is complete.' : `${personName.split(' ')[0]}'s answers saved.`)
       setRequest({ ...request, metadata: updatedMetadata } as Request)
       setTimeout(() => setClarificationSaveResult(''), 5000)
     }
-    setClarificationSaving(false)
+    setClarificationSaving(null)
+  }
+
+  async function handleBypassForPerson(personName: string) {
+    if (!request || !id) return
+    setClarificationSaving(personName)
+
+    const allQuestions = getClarificationQuestions()
+    const existingAnswers = getClarificationAnswers()
+    const personQuestions = allQuestions.filter(q => q.for === personName)
+
+    const bypassedAnswers: ClarificationA[] = personQuestions.map(q => ({
+      ...q,
+      answer: '',
+      bypassed: true,
+    }))
+
+    const otherAnswers = existingAnswers.filter(a => a.for !== personName)
+    const allAnswers = [...otherAnswers, ...bypassedAnswers]
+
+    const allPersons = [...new Set(allQuestions.map(q => q.for))]
+    const answeredPersons = new Set(allAnswers.map(a => a.for))
+    const allDone = allPersons.every(p => answeredPersons.has(p))
+
+    const updatedMetadata = {
+      ...request.metadata,
+      needs_clarification: !allDone,
+      clarification_answers: allAnswers,
+    }
+
+    const { error: saveErr } = await dhub.from('requests').update({
+      metadata: updatedMetadata,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)
+
+    if (saveErr) {
+      setClarificationSaveResult(`Error: ${saveErr.message}`)
+    } else {
+      setClarificationSaveResult(`Skipped for ${personName.split(' ')[0]}.`)
+      setRequest({ ...request, metadata: updatedMetadata } as Request)
+      setTimeout(() => setClarificationSaveResult(''), 5000)
+    }
+    setClarificationSaving(null)
   }
 
   async function fetchClarifications() {
@@ -504,73 +587,96 @@ export default function RequestDetail() {
               </div>
             ) : null}
 
-            {/* AI Clarification Q&A */}
-            {request.metadata?.clarification_questions && request.metadata.clarification_questions.length > 0 && (
-              <div className={`rounded-xl border p-4 mb-4 ${
-                request.metadata.needs_clarification
-                  ? 'bg-amber-50 border-amber-200'
-                  : 'bg-green-50 border-green-200'
-              }`}>
-                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-3">
-                  {request.metadata.needs_clarification ? (
-                    <>
-                      <AlertTriangle size={12} className="text-amber-600" />
-                      <span className="text-amber-700">More Details Needed</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check size={14} className="text-green-600" />
-                      <span className="text-green-700">Details Provided</span>
-                    </>
-                  )}
-                </h3>
+            {/* AI Clarification Q&A — Per Person */}
+            {getClarificationQuestions().length > 0 && (() => {
+              const allQuestions = getClarificationQuestions()
+              const allAnswers = getClarificationAnswers()
+              const unansweredPersons = getPersonsWithQuestions()
+              const answeredPersons = [...new Set(allAnswers.map(a => a.for))]
+              const needsWork = request.metadata?.needs_clarification === true
 
-                {request.metadata.needs_clarification ? (
-                  <>
-                    <p className="text-sm text-amber-700 mb-4">
-                      This request needs more detail before a developer can act on it. Please answer the questions below:
-                    </p>
-                    <div className="space-y-4">
-                      {request.metadata.clarification_questions.map((question: string, i: number) => (
-                        <div key={i}>
-                          <label className="block text-sm font-medium text-nha-gray-700 mb-1">
-                            {i + 1}. {question}
-                          </label>
-                          <textarea
-                            value={clarificationDrafts[i] ?? ''}
-                            onChange={e => setClarificationDrafts(prev => ({ ...prev, [i]: e.target.value }))}
-                            rows={2}
-                            placeholder="Type your answer..."
-                            className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-nha-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 resize-none"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={handleSaveClarificationAnswers}
-                      disabled={clarificationSaving}
-                      className="mt-4 px-4 py-2 bg-nha-blue text-white rounded-lg text-sm font-medium hover:bg-nha-blue/90 transition-colors disabled:opacity-40"
-                    >
-                      {clarificationSaving ? 'Saving...' : 'Save Answers'}
-                    </button>
-                    {clarificationSaveResult && (
-                      <p className={`text-xs mt-2 ${clarificationSaveResult.startsWith('Error') ? 'text-red-600' : clarificationSaveResult.startsWith('Please') ? 'text-amber-600' : 'text-green-600'}`}>
-                        {clarificationSaveResult}
-                      </p>
+              return (
+                <div className={`rounded-xl border p-4 mb-4 ${needsWork ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+                  <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-3">
+                    {needsWork ? (
+                      <><AlertTriangle size={12} className="text-amber-600" /><span className="text-amber-700">More Details Needed</span></>
+                    ) : (
+                      <><Check size={14} className="text-green-600" /><span className="text-green-700">Details Provided</span></>
                     )}
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    {request.metadata.clarification_answers?.map((qa: { question: string; answer: string }, i: number) => (
-                      <div key={i} className="bg-white rounded-lg border border-green-100 p-3">
-                        <p className="text-xs font-medium text-nha-gray-500 mb-1">Q: {qa.question}</p>
-                        <p className="text-sm text-nha-gray-700">{qa.answer}</p>
+                  </h3>
+
+                  {/* Show answered sections (green, read-only) */}
+                  {answeredPersons.map(person => {
+                    const personAnswers = allAnswers.filter(a => a.for === person)
+                    return (
+                      <div key={person} className="mb-4">
+                        <p className="text-xs font-semibold text-nha-gray-500 mb-2">{person}</p>
+                        <div className="space-y-2">
+                          {personAnswers.map((qa, i) => (
+                            <div key={i} className="bg-white rounded-lg border border-green-100 p-3">
+                              <p className="text-xs font-medium text-nha-gray-500 mb-1">Q: {qa.question}</p>
+                              {qa.bypassed ? (
+                                <p className="text-sm text-nha-gray-400 italic">Skipped</p>
+                              ) : (
+                                <p className="text-sm text-nha-gray-700">{qa.answer}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                    )
+                  })}
+
+                  {/* Show unanswered sections (amber, editable) */}
+                  {unansweredPersons.map(person => {
+                    const personQuestions = allQuestions.filter(q => q.for === person)
+                    return (
+                      <div key={person} className="mb-4">
+                        <p className="text-xs font-semibold text-amber-700 mb-2">{person}</p>
+                        <div className="space-y-3">
+                          {personQuestions.map((q, i) => (
+                            <div key={i}>
+                              <label className="block text-sm font-medium text-nha-gray-700 mb-1">
+                                {i + 1}. {q.question}
+                              </label>
+                              <textarea
+                                value={clarificationDrafts[`${person}::${i}`] ?? ''}
+                                onChange={e => setClarificationDrafts(prev => ({ ...prev, [`${person}::${i}`]: e.target.value }))}
+                                rows={2}
+                                placeholder="Type your answer..."
+                                className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-nha-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 resize-none"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2 mt-3">
+                          <button
+                            onClick={() => handleSaveForPerson(person)}
+                            disabled={clarificationSaving !== null}
+                            className="px-4 py-2 bg-nha-blue text-white rounded-lg text-sm font-medium hover:bg-nha-blue/90 transition-colors disabled:opacity-40"
+                          >
+                            {clarificationSaving === person ? 'Saving...' : 'Save Answers'}
+                          </button>
+                          <button
+                            onClick={() => handleBypassForPerson(person)}
+                            disabled={clarificationSaving !== null}
+                            className="px-4 py-2 border border-nha-gray-300 text-nha-gray-600 rounded-lg text-sm font-medium hover:bg-nha-gray-50 transition-colors disabled:opacity-40"
+                          >
+                            Skip
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {clarificationSaveResult && (
+                    <p className={`text-xs mt-2 ${clarificationSaveResult.startsWith('Error') ? 'text-red-600' : clarificationSaveResult.startsWith('Please') ? 'text-amber-600' : 'text-green-600'}`}>
+                      {clarificationSaveResult}
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Ask for Clarification */}
             {!isViewer && (

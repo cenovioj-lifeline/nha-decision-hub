@@ -19,7 +19,7 @@ interface Request {
     is_consolidated?: boolean
     source_count?: number
     needs_clarification?: boolean
-    clarification_answers?: { question: string; answer: string }[]
+    clarification_answers?: { question: string; answer: string; bypassed?: boolean }[]
   } | null
 }
 
