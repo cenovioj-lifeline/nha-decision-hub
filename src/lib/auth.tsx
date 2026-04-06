@@ -34,12 +34,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
       setSession(s)
       setUser(s?.user ?? null)
       if (s?.user) {
         setIsViewer(false)
-        checkAdmin(s.user.email)
+        await checkAdmin(s.user.email)
       }
       setLoading(false)
     })
