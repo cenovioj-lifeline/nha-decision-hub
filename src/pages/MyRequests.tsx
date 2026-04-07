@@ -98,7 +98,7 @@ export default function RequestsAndDecisions() {
       const { data } = await dhub
         .from('requests')
         .select('id, title, category, status, requester_name, requester_email, created_at, decisions(action, rationale, clickup_task_url, decided_at, priority, sprints(label))')
-        .not('status', 'in', '("consolidated","raw","on_hold")')
+        .not('status', 'in', '("consolidated","raw","on_hold","deleted")')
         .is('consolidated_into', null)
         .order('created_at', { ascending: false })
 
