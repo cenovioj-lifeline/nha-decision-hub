@@ -79,8 +79,6 @@ function buildGroups(rows: TrackingRow[]): SprintGroup[] {
     const end = first.sprint_end_date ? parseISO(first.sprint_end_date) : null
 
     const is_current = !!(start && end && today >= start && today <= end)
-    const is_future = !!(start && today < start)
-    const is_past = !!(end && today > end)
 
     const by_status: Record<string, TrackingRow[]> = {}
     for (const item of items) {
