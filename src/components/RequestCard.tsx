@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Clock, Layers, Mail, MessageSquare } from 'lucide-react'
+import { AlertTriangle, Clock, Copy, Layers, Mail, MessageSquare } from 'lucide-react'
 import CategoryIcon from './CategoryIcon'
 import StatusBadge from './StatusBadge'
 import { timeAgo } from '../lib/utils'
@@ -20,6 +20,7 @@ interface Request {
     source_count?: number
     needs_clarification?: boolean
     clarification_answers?: { question: string; answer: string; bypassed?: boolean }[]
+    possible_duplicate?: boolean
   } | null
 }
 
@@ -36,7 +37,7 @@ export default function RequestCard({ request }: RequestCardProps) {
   const navigate = useNavigate()
   const analysis = request.ai_analysis as { summary?: string } | null
   const SourceIcon = SOURCE_ICONS[request.source]
-  const meta = request.metadata as { is_consolidated?: boolean; source_count?: number; needs_clarification?: boolean; clarification_answers?: unknown[] } | null
+  const meta = request.metadata as { is_consolidated?: boolean; source_count?: number; needs_clarification?: boolean; clarification_answers?: unknown[]; possible_duplicate?: boolean } | null
   const isConsolidated = meta?.is_consolidated === true
   const sourceCount = meta?.source_count ?? 1
 
@@ -85,6 +86,15 @@ export default function RequestCard({ request }: RequestCardProps) {
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
                   <AlertTriangle size={10} />
                   Needs details
+                </span>
+              </>
+            )}
+            {meta?.possible_duplicate && (
+              <>
+                <span className="text-nha-gray-300">|</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200">
+                  <Copy size={10} />
+                  Possible duplicate
                 </span>
               </>
             )}

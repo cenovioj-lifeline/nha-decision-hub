@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Inbox as InboxIcon, RefreshCw, Clock, Sparkles, ChevronDown, Check, AlertTriangle } from 'lucide-react'
+import { Inbox as InboxIcon, RefreshCw, Clock, Sparkles, ChevronDown, Check, AlertTriangle, Copy } from 'lucide-react'
 import { dhub } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import RequestCard from '../components/RequestCard'
@@ -28,6 +28,7 @@ export default function Inbox() {
   const [selectedRequesters, setSelectedRequesters] = useState<Set<string>>(new Set())
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [showNeedsClarification, setShowNeedsClarification] = useState(false)
+  const [showPossibleDuplicates, setShowPossibleDuplicates] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   async function fetchRequests() {
@@ -99,16 +100,26 @@ export default function Inbox() {
     const meta = r.metadata as Record<string, unknown> | null
     return meta?.needs_clarification === true && !(meta?.clarification_answers as unknown[])?.length
   }).length
+  const possibleDuplicateCount = requests.filter(r => {
+    const meta = r.metadata as Record<string, unknown> | null
+    return meta?.possible_duplicate === true
+  }).length
   const isFiltered = selectedRequesters.size > 0 && selectedRequesters.size < requesterNames.length
   const afterRequesterFilter = isFiltered
     ? requests.filter(r => selectedRequesters.has(r.requester_name))
     : requests
-  const filtered = showNeedsClarification
+  const afterClarificationFilter = showNeedsClarification
     ? afterRequesterFilter.filter(r => {
         const meta = r.metadata as Record<string, unknown> | null
         return meta?.needs_clarification === true && !(meta?.clarification_answers as unknown[])?.length
       })
     : afterRequesterFilter
+  const filtered = showPossibleDuplicates
+    ? afterClarificationFilter.filter(r => {
+        const meta = r.metadata as Record<string, unknown> | null
+        return meta?.possible_duplicate === true
+      })
+    : afterClarificationFilter
 
   function toggleRequester(name: string) {
     setSelectedRequesters(prev => {
@@ -132,11 +143,14 @@ export default function Inbox() {
         <div>
           <h1 className="text-2xl font-bold text-nha-gray-900">Inbox</h1>
           <p className="text-sm text-nha-gray-500 mt-1">
-            {isFiltered || showNeedsClarification
+            {isFiltered || showNeedsClarification || showPossibleDuplicates
               ? `${filtered.length} of ${requests.length} requests (filtered)`
               : `${requests.length} request${requests.length !== 1 ? 's' : ''} awaiting decision`}
             {needsClarificationCount > 0 && !showNeedsClarification && (
               <span className="text-amber-600"> · {needsClarificationCount} need{needsClarificationCount === 1 ? 's' : ''} details</span>
+            )}
+            {possibleDuplicateCount > 0 && !showPossibleDuplicates && (
+              <span className="text-orange-600"> · {possibleDuplicateCount} possible duplicate{possibleDuplicateCount === 1 ? '' : 's'}</span>
             )}
           </p>
         </div>
@@ -201,6 +215,19 @@ export default function Inbox() {
             >
               <AlertTriangle size={14} />
               Needs details ({needsClarificationCount})
+            </button>
+          )}
+          {possibleDuplicateCount > 0 && (
+            <button
+              onClick={() => setShowPossibleDuplicates(prev => !prev)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${
+                showPossibleDuplicates
+                  ? 'border-orange-300 bg-orange-50 text-orange-700'
+                  : 'border-nha-gray-200 text-nha-gray-600 hover:bg-nha-gray-50'
+              }`}
+            >
+              <Copy size={14} />
+              Possible duplicates ({possibleDuplicateCount})
             </button>
           )}
         </div>
