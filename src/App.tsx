@@ -9,6 +9,7 @@ import RequestDetail from './pages/RequestDetail'
 import RequestsAndDecisions from './pages/MyRequests'
 import Sprints from './pages/Sprints'
 import Dashboard from './pages/Dashboard'
+import Tracking from './pages/Tracking'
 import Guide from './pages/Guide'
 import Admin from './pages/Admin'
 
@@ -46,6 +47,7 @@ export default function App() {
             <Route path="/inbox" element={<ProtectedRoute adminOnly><Inbox /></ProtectedRoute>} />
             <Route path="/requests/:id" element={<RequestDetail />} />
             <Route path="/sprints" element={<ProtectedRoute adminOnly><Sprints /></ProtectedRoute>} />
+            <Route path="/tracking" element={<Tracking />} />
             <Route path="/dashboard" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
             <Route path="/requests" element={<RequestsAndDecisions />} />
@@ -54,7 +56,6 @@ export default function App() {
             <Route path="/my-requests" element={<Navigate to="/requests" replace />} />
             <Route path="/decisions" element={<Navigate to="/requests" replace />} />
             <Route path="/declined" element={<Navigate to="/requests" replace />} />
-            <Route path="/tracking" element={<Navigate to="/requests" replace />} />
             <Route path="/upload" element={<Navigate to="/inbox" replace />} />
           </Route>
         </Routes>

@@ -13,6 +13,7 @@ import {
   Eye,
   Settings,
   BookOpen,
+  Activity,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { cn } from '../lib/utils'
@@ -27,6 +28,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/inbox', label: 'Inbox', icon: Inbox, adminOnly: true },
   { to: '/sprints', label: 'Sprints', icon: Calendar, adminOnly: true },
+  { to: '/tracking', label: 'Tracking', icon: Activity },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
   { to: '/requests', label: 'Requests & Decisions', icon: FileText },
   { to: '/guide', label: 'Submission Guide', icon: BookOpen },
