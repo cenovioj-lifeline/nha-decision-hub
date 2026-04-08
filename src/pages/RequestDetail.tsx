@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Check, Clock, Copy, ExternalLink, Image, Layers, Mail, MessageCircleQuestion, MessageSquare, Paperclip, Pencil, RefreshCw, Reply, Send, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Check, Clock, ExternalLink, Mail, MessageCircleQuestion, Pencil, Reply, Send } from 'lucide-react'
 import { dhub, supabase } from '../lib/supabase'
 import { timeAgo, formatDateTime } from '../lib/utils'
 import { useAuth } from '../lib/auth'
@@ -8,66 +8,14 @@ import CategoryIcon from '../components/CategoryIcon'
 import StatusBadge from '../components/StatusBadge'
 import AnalysisPanel from '../components/AnalysisPanel'
 import DecisionForm from '../components/DecisionForm'
+import SourceMessages from '../components/request-detail/SourceMessages'
+import AttachmentsGrid from '../components/request-detail/AttachmentsGrid'
+import DuplicateCheckSection from '../components/request-detail/DuplicateCheckSection'
+import DeleteRequestButton from '../components/request-detail/DeleteRequestButton'
+import ClarificationSection from '../components/request-detail/ClarificationSection'
+import type { DhubRequest } from '../types/request'
 
-interface Request {
-  id: string
-  source: string
-  source_ref: string | null
-  source_channel: string | null
-  requester_name: string
-  requester_email: string | null
-  category: string
-  title: string
-  description: string | null
-  attachments: { url: string; name: string; type: string }[] | null
-  ai_analysis: Record<string, unknown> | null
-  ai_analyzed_at: string | null
-  status: string
-  po_notes: string | null
-  created_at: string
-  updated_at: string
-  dev_estimate_hours: number | null
-  metadata: {
-    cc?: string | null
-    subject_full?: string | null
-    message_id?: string | null
-    is_consolidated?: boolean
-    source_count?: number
-    source_messages?: {
-      id: string
-      author: string
-      source: string
-      date: string
-      original_text: string
-      has_attachment: boolean
-    }[]
-    consolidation_reasoning?: string
-    consolidation_note?: string
-    needs_clarification?: boolean
-    clarification_questions?: (string | { question: string; for: string; for_email: string })[]
-    clarification_answers?: { question: string; for: string; for_email: string; answer: string; bypassed?: boolean }[]
-    possible_duplicate?: boolean
-    duplicate_check?: {
-      checked_at: string
-      verdict: 'same' | 'related' | 'none'
-      candidates: {
-        clickup_task_id: string
-        clickup_task_url: string
-        title: string
-        status: string
-        list_name: string | null
-        verdict: 'same' | 'related'
-        reasoning: string
-      }[]
-      dismissed_at: string | null
-      dismissed_by: string | null
-      dismissed_reason: string | null
-      email_sent_at: string | null
-      email_error: string | null
-    }
-  } | null
-}
-
+// Local Decision type — only used here for the decision sidebar block
 interface Decision {
   id: string
   action: string
@@ -80,17 +28,18 @@ interface Decision {
   sprints: { label: string } | { label: string }[] | null
 }
 
+const CATEGORIES = ['bug', 'feature', 'ux', 'question', 'data']
+
 export default function RequestDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { isViewer, isAdmin, user } = useAuth()
-  const [request, setRequest] = useState<Request | null>(null)
+  const { isViewer } = useAuth()
+  const [request, setRequest] = useState<DhubRequest | null>(null)
   const [decision, setDecision] = useState<Decision | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
-  // Editable fields
+  // Editable fields (header — title, name, email, description)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [editingName, setEditingName] = useState(false)
@@ -107,150 +56,85 @@ export default function RequestDetail() {
   const descTextareaRef = useRef<HTMLTextAreaElement>(null)
   const poNotesTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
-  // Clarification state
+  // Manual "Ask for clarification" Slack DM (separate from the AI clarification Q&A)
   const [clarificationMsg, setClarificationMsg] = useState('')
   const [clarificationSending, setClarificationSending] = useState(false)
   const [clarificationResult, setClarificationResult] = useState('')
   const [clarifications, setClarifications] = useState<{ message_text: string; created_at: string }[]>([])
 
-  // AI clarification Q&A state (per-person)
-  const [clarificationDrafts, setClarificationDrafts] = useState<Record<string, string>>({})
-  const [clarificationSaving, setClarificationSaving] = useState<string | null>(null)
-  const [clarificationSaveResult, setClarificationSaveResult] = useState('')
-
-  // Delete state
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [deleteReason, setDeleteReason] = useState('')
-  const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
-
-  // Duplicate-check state
-  const [recheckingDup, setRecheckingDup] = useState(false)
-  const [dupActionMsg, setDupActionMsg] = useState('')
-  const [showDismissModal, setShowDismissModal] = useState(false)
-  const [dismissReason, setDismissReason] = useState('')
-  const [dismissing, setDismissing] = useState(false)
-
-  // Helper types for per-person questions
-  type ClarificationQ = { question: string; for: string; for_email: string }
-  type ClarificationA = { question: string; for: string; for_email: string; answer: string; bypassed?: boolean }
-
-  function getClarificationQuestions(): ClarificationQ[] {
-    const raw = request?.metadata?.clarification_questions
-    if (!Array.isArray(raw)) return []
-    // Handle both old format (string[]) and new format (object[])
-    return raw.map((q: unknown) => {
-      if (typeof q === 'string') return { question: q, for: request?.requester_name ?? 'Unknown', for_email: request?.requester_email ?? '' }
-      return q as ClarificationQ
-    })
+  async function updateField(field: string, value: string | null) {
+    if (!id) return
+    await dhub.from('requests').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', id)
   }
 
-  function getClarificationAnswers(): ClarificationA[] {
-    return (request?.metadata?.clarification_answers ?? []) as ClarificationA[]
+  function handleTitleEdit() {
+    if (!request) return
+    setTitleDraft(request.title)
+    setEditingTitle(true)
+    setTimeout(() => titleInputRef.current?.focus(), 50)
+  }
+  async function handleTitleSave() {
+    if (!request || !titleDraft.trim()) return
+    setEditingTitle(false)
+    await updateField('title', titleDraft.trim())
+    setRequest({ ...request, title: titleDraft.trim() })
   }
 
-  function getPersonsWithQuestions(): string[] {
-    const questions = getClarificationQuestions()
-    const answers = getClarificationAnswers()
-    const answeredKeys = new Set(answers.map(a => `${a.for}::${a.question}`))
-    const persons = new Set<string>()
-    for (const q of questions) {
-      if (!answeredKeys.has(`${q.for}::${q.question}`)) persons.add(q.for)
-    }
-    return [...persons].sort()
+  function handleNameEdit() {
+    if (!request) return
+    setNameDraft(request.requester_name)
+    setEditingName(true)
+    setTimeout(() => nameInputRef.current?.focus(), 50)
+  }
+  async function handleNameSave() {
+    if (!request || !nameDraft.trim()) return
+    setEditingName(false)
+    await updateField('requester_name', nameDraft.trim())
+    setRequest({ ...request, requester_name: nameDraft.trim() })
   }
 
-  async function handleSaveForPerson(personName: string) {
-    if (!request || !id) return
-    setClarificationSaving(personName)
-    setClarificationSaveResult('')
-
-    const allQuestions = getClarificationQuestions()
-    const existingAnswers = getClarificationAnswers()
-    const personQuestions = allQuestions.filter(q => q.for === personName)
-
-    const newAnswers: ClarificationA[] = personQuestions.map((q, i) => ({
-      ...q,
-      answer: (clarificationDrafts[`${personName}::${i}`] ?? '').trim(),
-    }))
-
-    const unanswered = newAnswers.filter(a => !a.answer)
-    if (unanswered.length > 0) {
-      setClarificationSaveResult(`Please answer all questions before saving.`)
-      setClarificationSaving(null)
-      return
-    }
-
-    // Merge with existing answers from other people
-    const otherAnswers = existingAnswers.filter(a => a.for !== personName)
-    const allAnswers = [...otherAnswers, ...newAnswers]
-
-    // Check if ALL people have now answered
-    const allPersons = [...new Set(allQuestions.map(q => q.for))]
-    const answeredPersons = new Set(allAnswers.map(a => a.for))
-    const allDone = allPersons.every(p => answeredPersons.has(p))
-
-    const updatedMetadata = {
-      ...request.metadata,
-      needs_clarification: !allDone,
-      clarification_answers: allAnswers,
-    }
-
-    const { error: saveErr } = await dhub.from('requests').update({
-      metadata: updatedMetadata,
-      updated_at: new Date().toISOString(),
-    }).eq('id', id)
-
-    if (saveErr) {
-      setClarificationSaveResult(`Error: ${saveErr.message}`)
-    } else {
-      setClarificationSaveResult(allDone ? 'All answers saved — request is complete.' : `${personName.split(' ')[0]}'s answers saved.`)
-      setRequest({ ...request, metadata: updatedMetadata } as Request)
-      setTimeout(() => setClarificationSaveResult(''), 5000)
-    }
-    setClarificationSaving(null)
+  function handleEmailEdit() {
+    if (!request) return
+    setEmailDraft(request.requester_email || '')
+    setEditingEmail(true)
+    setTimeout(() => emailInputRef.current?.focus(), 50)
+  }
+  async function handleEmailSave() {
+    if (!request) return
+    setEditingEmail(false)
+    const val = emailDraft.trim() || null
+    await updateField('requester_email', val)
+    setRequest({ ...request, requester_email: val })
   }
 
-  async function handleBypassForPerson(personName: string) {
-    if (!request || !id) return
-    setClarificationSaving(personName)
+  function handleDescEdit() {
+    if (!request) return
+    setDescDraft(request.description || '')
+    setEditingDesc(true)
+    setTimeout(() => descTextareaRef.current?.focus(), 50)
+  }
+  async function handleDescSave() {
+    if (!request) return
+    setEditingDesc(false)
+    await updateField('description', descDraft)
+    setRequest({ ...request, description: descDraft })
+  }
 
-    const allQuestions = getClarificationQuestions()
-    const existingAnswers = getClarificationAnswers()
-    const personQuestions = allQuestions.filter(q => q.for === personName)
+  async function handleCategoryChange(newCat: string) {
+    if (!request) return
+    await updateField('category', newCat)
+    setRequest({ ...request, category: newCat })
+  }
 
-    const bypassedAnswers: ClarificationA[] = personQuestions.map(q => ({
-      ...q,
-      answer: '',
-      bypassed: true,
-    }))
-
-    const otherAnswers = existingAnswers.filter(a => a.for !== personName)
-    const allAnswers = [...otherAnswers, ...bypassedAnswers]
-
-    const allPersons = [...new Set(allQuestions.map(q => q.for))]
-    const answeredPersons = new Set(allAnswers.map(a => a.for))
-    const allDone = allPersons.every(p => answeredPersons.has(p))
-
-    const updatedMetadata = {
-      ...request.metadata,
-      needs_clarification: !allDone,
-      clarification_answers: allAnswers,
-    }
-
-    const { error: saveErr } = await dhub.from('requests').update({
-      metadata: updatedMetadata,
-      updated_at: new Date().toISOString(),
-    }).eq('id', id)
-
-    if (saveErr) {
-      setClarificationSaveResult(`Error: ${saveErr.message}`)
-    } else {
-      setClarificationSaveResult(`Skipped for ${personName.split(' ')[0]}.`)
-      setRequest({ ...request, metadata: updatedMetadata } as Request)
-      setTimeout(() => setClarificationSaveResult(''), 5000)
-    }
-    setClarificationSaving(null)
+  function handlePoNotesChange(value: string) {
+    setPoNotes(value)
+    setPoNotesSaved(false)
+    if (poNotesTimerRef.current) clearTimeout(poNotesTimerRef.current)
+    poNotesTimerRef.current = setTimeout(async () => {
+      await updateField('po_notes', value || null)
+      setPoNotesSaved(true)
+      setTimeout(() => setPoNotesSaved(false), 2000)
+    }, 1000)
   }
 
   async function fetchClarifications() {
@@ -296,200 +180,6 @@ export default function RequestDetail() {
     }
   }
 
-  const CATEGORIES = ['bug', 'feature', 'ux', 'question', 'data']
-
-  async function updateField(field: string, value: string | null) {
-    if (!id) return
-    await dhub.from('requests').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', id)
-  }
-
-  function handleTitleEdit() {
-    if (!request) return
-    setTitleDraft(request.title)
-    setEditingTitle(true)
-    setTimeout(() => titleInputRef.current?.focus(), 50)
-  }
-
-  async function handleTitleSave() {
-    if (!request || !titleDraft.trim()) return
-    setEditingTitle(false)
-    await updateField('title', titleDraft.trim())
-    setRequest({ ...request, title: titleDraft.trim() })
-  }
-
-  function handleNameEdit() {
-    if (!request) return
-    setNameDraft(request.requester_name)
-    setEditingName(true)
-    setTimeout(() => nameInputRef.current?.focus(), 50)
-  }
-
-  async function handleNameSave() {
-    if (!request || !nameDraft.trim()) return
-    setEditingName(false)
-    await updateField('requester_name', nameDraft.trim())
-    setRequest({ ...request, requester_name: nameDraft.trim() })
-  }
-
-  function handleEmailEdit() {
-    if (!request) return
-    setEmailDraft(request.requester_email || '')
-    setEditingEmail(true)
-    setTimeout(() => emailInputRef.current?.focus(), 50)
-  }
-
-  async function handleEmailSave() {
-    if (!request) return
-    setEditingEmail(false)
-    const val = emailDraft.trim() || null
-    await updateField('requester_email', val)
-    setRequest({ ...request, requester_email: val })
-  }
-
-  function handleDescEdit() {
-    if (!request) return
-    setDescDraft(request.description || '')
-    setEditingDesc(true)
-    setTimeout(() => descTextareaRef.current?.focus(), 50)
-  }
-
-  async function handleDescSave() {
-    if (!request) return
-    setEditingDesc(false)
-    await updateField('description', descDraft)
-    setRequest({ ...request, description: descDraft })
-  }
-
-  async function handleCategoryChange(newCat: string) {
-    if (!request) return
-    await updateField('category', newCat)
-    setRequest({ ...request, category: newCat })
-  }
-
-  async function handleRecheckDuplicate() {
-    if (!id) return
-    setRecheckingDup(true)
-    setDupActionMsg('')
-    try {
-      const res = await fetch(
-        'https://nhwdgstjhugezhqlktie.supabase.co/functions/v1/dhub-duplicate-check',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ''}`,
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5od2Rnc3RqaHVnZXpocWxrdGllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTUzMjMsImV4cCI6MjA2ODc3MTMyM30.dsN6HiFYtM1MXxOcyaI-O7vbJxN-si1V3Eth0oIY2JE',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ request_id: id }),
-        }
-      )
-      const data = await res.json()
-      if (data.error) {
-        setDupActionMsg(`Error: ${data.error}`)
-      } else if (data.candidate_count === 0) {
-        setDupActionMsg('No matches found')
-      } else {
-        setDupActionMsg(`Found ${data.candidate_count} possible match${data.candidate_count === 1 ? '' : 'es'}`)
-      }
-      fetchData()
-    } catch (err) {
-      setDupActionMsg(`Failed: ${err instanceof Error ? err.message : 'Unknown'}`)
-    } finally {
-      setRecheckingDup(false)
-      setTimeout(() => setDupActionMsg(''), 6000)
-    }
-  }
-
-  async function handleDismissDuplicate() {
-    if (!request || !id) return
-    setDismissing(true)
-    try {
-      const oldDup = request.metadata?.duplicate_check
-      if (!oldDup) return
-      const updatedDup = {
-        ...oldDup,
-        dismissed_at: new Date().toISOString(),
-        dismissed_by: user?.email ?? 'unknown',
-        dismissed_reason: dismissReason.trim() || null,
-      }
-      const newMeta = {
-        ...request.metadata,
-        duplicate_check: updatedDup,
-        possible_duplicate: false,
-      }
-      const { error: err } = await dhub.from('requests').update({
-        metadata: newMeta,
-        updated_at: new Date().toISOString(),
-      }).eq('id', id)
-      if (err) throw err
-      setRequest({ ...request, metadata: newMeta } as Request)
-      setShowDismissModal(false)
-      setDismissReason('')
-      setDupActionMsg('Flag dismissed')
-      setTimeout(() => setDupActionMsg(''), 4000)
-    } catch (err) {
-      setDupActionMsg(`Error: ${err instanceof Error ? err.message : 'Unknown'}`)
-    } finally {
-      setDismissing(false)
-    }
-  }
-
-  async function handleDelete() {
-    if (!request || !id) return
-    setDeleting(true)
-    setDeleteError('')
-
-    try {
-      const deletedAt = new Date().toISOString()
-      const deletedBy = user?.email ?? 'unknown'
-      const reason = deleteReason.trim() || null
-
-      // Cascade: mark any underlying raw children (consolidated_into = this id) as deleted too
-      const childUpdate = {
-        status: 'deleted',
-        updated_at: deletedAt,
-      }
-      const { error: childErr } = await dhub
-        .from('requests')
-        .update(childUpdate)
-        .eq('consolidated_into', id)
-      if (childErr) throw childErr
-
-      // Soft-delete the card itself
-      const updatedMetadata = {
-        ...request.metadata,
-        deleted_at: deletedAt,
-        deleted_by: deletedBy,
-        deleted_reason: reason,
-      }
-      const { error: cardErr } = await dhub
-        .from('requests')
-        .update({
-          status: 'deleted',
-          metadata: updatedMetadata,
-          updated_at: deletedAt,
-        })
-        .eq('id', id)
-      if (cardErr) throw cardErr
-
-      navigate('/')
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Failed to delete request')
-      setDeleting(false)
-    }
-  }
-
-  function handlePoNotesChange(value: string) {
-    setPoNotes(value)
-    setPoNotesSaved(false)
-    if (poNotesTimerRef.current) clearTimeout(poNotesTimerRef.current)
-    poNotesTimerRef.current = setTimeout(async () => {
-      await updateField('po_notes', value || null)
-      setPoNotesSaved(true)
-      setTimeout(() => setPoNotesSaved(false), 2000)
-    }, 1000)
-  }
-
   async function fetchData() {
     if (!id) return
     setLoading(true)
@@ -505,8 +195,8 @@ export default function RequestDetail() {
       }
 
       if (reqRes.data) {
-        setRequest(reqRes.data as Request)
-        setPoNotes((reqRes.data as Request).po_notes || '')
+        setRequest(reqRes.data as DhubRequest)
+        setPoNotes((reqRes.data as DhubRequest).po_notes || '')
       }
 
       const decRes = await dhub.from('decisions').select('*, sprints(label)').eq('request_id', id).order('decided_at', { ascending: false }).limit(1)
@@ -524,6 +214,7 @@ export default function RequestDetail() {
   useEffect(() => {
     fetchData()
     fetchClarifications()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   if (loading) {
@@ -589,16 +280,14 @@ export default function RequestDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Header */}
+          {/* Header card */}
           <div className="bg-white rounded-2xl border border-nha-gray-200 p-6">
             <div className="flex items-start gap-3 mb-4">
               <CategoryIcon category={request.category} />
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   {isViewer ? (
-                    <h1 className="text-xl font-bold text-nha-gray-900">
-                      {request.title}
-                    </h1>
+                    <h1 className="text-xl font-bold text-nha-gray-900">{request.title}</h1>
                   ) : editingTitle ? (
                     <div className="flex items-center gap-2 flex-1">
                       <input
@@ -725,105 +414,15 @@ export default function RequestDetail() {
               </div>
             ) : poNotes ? (
               <div className="mb-4">
-                <label className="block text-xs font-bold uppercase tracking-wider text-nha-gray-400 mb-2">
-                  Notes
-                </label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-nha-gray-400 mb-2">Notes</label>
                 <p className="text-sm text-nha-gray-700 whitespace-pre-wrap">{poNotes}</p>
               </div>
             ) : null}
 
-            {/* AI Clarification Q&A — Per Person */}
-            {getClarificationQuestions().length > 0 && (() => {
-              const allQuestions = getClarificationQuestions()
-              const allAnswers = getClarificationAnswers()
-              const unansweredPersons = getPersonsWithQuestions()
-              const answeredPersons = [...new Set(allAnswers.map(a => a.for))]
-              const needsWork = request.metadata?.needs_clarification === true
+            {/* AI Clarification Q&A — extracted to its own component */}
+            <ClarificationSection request={request} onChange={fetchData} />
 
-              return (
-                <div className={`rounded-xl border p-4 mb-4 ${needsWork ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
-                  <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-3">
-                    {needsWork ? (
-                      <><AlertTriangle size={12} className="text-amber-600" /><span className="text-amber-700">More Details Needed</span></>
-                    ) : (
-                      <><Check size={14} className="text-green-600" /><span className="text-green-700">Details Provided</span></>
-                    )}
-                  </h3>
-
-                  {/* Show answered sections (green, read-only) */}
-                  {answeredPersons.map(person => {
-                    const personAnswers = allAnswers.filter(a => a.for === person)
-                    return (
-                      <div key={person} className="mb-4">
-                        <p className="text-xs font-semibold text-nha-gray-500 mb-2">{person}</p>
-                        <div className="space-y-2">
-                          {personAnswers.map((qa, i) => (
-                            <div key={i} className="bg-white rounded-lg border border-green-100 p-3">
-                              <p className="text-xs font-medium text-nha-gray-500 mb-1">Q: {qa.question}</p>
-                              {qa.bypassed ? (
-                                <p className="text-sm text-nha-gray-400 italic">Skipped</p>
-                              ) : (
-                                <p className="text-sm text-nha-gray-700">{qa.answer}</p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-
-                  {/* Show unanswered sections (amber, editable) */}
-                  {unansweredPersons.map(person => {
-                    const personQuestions = allQuestions.filter(q => q.for === person)
-                    return (
-                      <div key={person} className="mb-4">
-                        <p className="text-xs font-semibold text-amber-700 mb-2">{person}</p>
-                        <div className="space-y-3">
-                          {personQuestions.map((q, i) => (
-                            <div key={i}>
-                              <label className="block text-sm font-medium text-nha-gray-700 mb-1">
-                                {i + 1}. {q.question}
-                              </label>
-                              <textarea
-                                value={clarificationDrafts[`${person}::${i}`] ?? ''}
-                                onChange={e => setClarificationDrafts(prev => ({ ...prev, [`${person}::${i}`]: e.target.value }))}
-                                rows={2}
-                                placeholder="Type your answer..."
-                                className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-nha-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 resize-none"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-2 mt-3">
-                          <button
-                            onClick={() => handleSaveForPerson(person)}
-                            disabled={clarificationSaving !== null}
-                            className="px-4 py-2 bg-nha-blue text-white rounded-lg text-sm font-medium hover:bg-nha-blue/90 transition-colors disabled:opacity-40"
-                          >
-                            {clarificationSaving === person ? 'Saving...' : 'Save Answers'}
-                          </button>
-                          <button
-                            onClick={() => handleBypassForPerson(person)}
-                            disabled={clarificationSaving !== null}
-                            className="px-4 py-2 border border-nha-gray-300 text-nha-gray-600 rounded-lg text-sm font-medium hover:bg-nha-gray-50 transition-colors disabled:opacity-40"
-                          >
-                            Skip
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-
-                  {clarificationSaveResult && (
-                    <p className={`text-xs mt-2 ${clarificationSaveResult.startsWith('Error') ? 'text-red-600' : clarificationSaveResult.startsWith('Please') ? 'text-amber-600' : 'text-green-600'}`}>
-                      {clarificationSaveResult}
-                    </p>
-                  )}
-                </div>
-              )
-            })()}
-
-            {/* Ask for Clarification */}
+            {/* Manual Ask for Clarification (Slack DM) */}
             {!isViewer && (
               <div className="mb-4">
                 <label className="block text-xs font-bold uppercase tracking-wider text-nha-gray-400 mb-2 flex items-center gap-1.5">
@@ -898,208 +497,15 @@ export default function RequestDetail() {
               </div>
             )}
 
-            {/* Attachments */}
-            {request.attachments && request.attachments.length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-sm font-medium text-nha-gray-700 mb-2 flex items-center gap-1">
-                  <Paperclip size={14} />
-                  Attachments
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {request.attachments.map((att, i) => {
-                    const isSlackPrivate = att.url?.includes('files.slack.com/files-pri')
-                    const isImage = att.type?.startsWith('image/')
-                    return (
-                    <div key={i}>
-                      {isImage && !isSlackPrivate ? (
-                        <button
-                          onClick={() => setLightboxUrl(att.url)}
-                          className="w-full text-left"
-                        >
-                          <img
-                            src={att.url}
-                            alt={att.name}
-                            className="rounded-lg border border-nha-gray-200 w-full object-cover max-h-64 hover:opacity-90 transition-opacity cursor-pointer"
-                          />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setLightboxUrl(att.url)}
-                          className="w-full flex items-center gap-2 bg-nha-gray-50 rounded-lg border border-nha-gray-200 p-3 hover:bg-nha-gray-100 transition-colors"
-                        >
-                          {isImage ? <Image size={14} className="text-nha-gray-400" /> : <Paperclip size={14} className="text-nha-gray-400" />}
-                          <span className="text-sm text-nha-gray-700 truncate">{att.name || 'Attachment'}</span>
-                        </button>
-                      )}
-                    </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Attachments — extracted to its own component (owns lightbox state) */}
+            <AttachmentsGrid attachments={request.attachments} />
           </div>
 
-          {/* Possible Duplicate */}
-          {request.metadata?.duplicate_check && (() => {
-            const dup = request.metadata.duplicate_check
-            const isDismissed = !!dup.dismissed_at
-            const isActive = request.metadata.possible_duplicate === true
-            const candidates = dup.candidates ?? []
-            if (candidates.length === 0 && !isDismissed) return null
-            return (
-              <div className={`bg-white rounded-2xl border p-6 ${isActive ? 'border-orange-300' : 'border-nha-gray-200'}`}>
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className="flex items-center gap-2">
-                    <Copy size={16} className={isActive ? 'text-orange-600' : 'text-nha-gray-400'} />
-                    <h3 className={`font-semibold ${isActive ? 'text-orange-700' : 'text-nha-gray-500'}`}>
-                      {isActive ? 'Possible duplicate' : 'Possible duplicate (dismissed)'}
-                    </h3>
-                    {dup.verdict && isActive && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 capitalize">
-                        {dup.verdict}
-                      </span>
-                    )}
-                  </div>
-                  {!isViewer && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleRecheckDuplicate}
-                        disabled={recheckingDup}
-                        className="inline-flex items-center gap-1 text-xs text-nha-gray-500 hover:text-nha-gray-700 px-2 py-1 rounded hover:bg-nha-gray-50"
-                        title="Re-run duplicate check"
-                      >
-                        <RefreshCw size={12} className={recheckingDup ? 'animate-spin' : ''} />
-                        Re-check
-                      </button>
-                      {isActive && isAdmin && (
-                        <button
-                          onClick={() => { setDismissReason(''); setShowDismissModal(true) }}
-                          className="inline-flex items-center gap-1 text-xs text-nha-gray-600 hover:text-nha-gray-800 px-2 py-1 rounded border border-nha-gray-200 hover:bg-nha-gray-50"
-                        >
-                          Dismiss flag
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
+          {/* Possible Duplicate — extracted */}
+          <DuplicateCheckSection request={request} onChange={fetchData} />
 
-                {dupActionMsg && (
-                  <div className="mb-3 text-xs text-nha-gray-500 bg-nha-gray-50 px-3 py-2 rounded">{dupActionMsg}</div>
-                )}
-
-                {isDismissed && (
-                  <div className="mb-4 text-sm text-nha-gray-500 italic">
-                    Dismissed by {dup.dismissed_by} on {formatDateTime(dup.dismissed_at!)}
-                    {dup.dismissed_reason && (
-                      <div className="mt-1 text-nha-gray-600 not-italic">"{dup.dismissed_reason}"</div>
-                    )}
-                  </div>
-                )}
-
-                {candidates.length > 0 ? (
-                  <div className="space-y-3">
-                    {candidates.map((c) => (
-                      <div
-                        key={c.clickup_task_id}
-                        className={`rounded-xl border p-3 ${isActive ? 'border-orange-100 bg-orange-50/30' : 'border-nha-gray-100 bg-nha-gray-50/30'}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.verdict === 'same' ? 'bg-orange-100 text-orange-700' : 'bg-amber-50 text-amber-700'}`}>
-                                {c.verdict === 'same' ? 'Likely same' : 'Related'}
-                              </span>
-                              <span className="text-xs text-nha-gray-500">{c.status}</span>
-                              {c.list_name && <span className="text-xs text-nha-gray-400">· {c.list_name}</span>}
-                            </div>
-                            <h4 className="font-medium text-nha-gray-800 text-sm">{c.title}</h4>
-                            <p className="text-sm text-nha-gray-600 mt-1.5 leading-relaxed">{c.reasoning}</p>
-                          </div>
-                          <a
-                            href={c.clickup_task_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-nha-sky hover:text-nha-blue shrink-0 mt-1"
-                            title="Open in ClickUp"
-                          >
-                            <ExternalLink size={14} />
-                          </a>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-nha-gray-400 italic">No matches found in the most recent check.</p>
-                )}
-
-                {dup.email_sent_at && (
-                  <p className="text-xs text-nha-gray-400 mt-4">
-                    Email sent to requester {formatDateTime(dup.email_sent_at)}
-                  </p>
-                )}
-                {dup.email_error && (
-                  <p className="text-xs text-red-500 mt-4">Email failed: {dup.email_error}</p>
-                )}
-              </div>
-            )
-          })()}
-
-          {/* Sources */}
-          {request.metadata?.source_messages && request.metadata.source_messages.length > 0 && (
-            <div className="bg-white rounded-2xl border border-nha-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                {request.metadata.is_consolidated ? (
-                  <>
-                    <Layers size={16} className="text-purple-600" />
-                    <h3 className="font-semibold text-nha-gray-800">
-                      Consolidated from {request.metadata.source_count} messages
-                    </h3>
-                  </>
-                ) : (
-                  <>
-                    {request.source === 'email' ? (
-                      <Mail size={16} className="text-blue-600" />
-                    ) : (
-                      <MessageSquare size={16} className="text-green-600" />
-                    )}
-                    <h3 className="font-semibold text-nha-gray-800">
-                      Original {request.source === 'email' ? 'Email' : 'Slack Message'}
-                    </h3>
-                  </>
-                )}
-              </div>
-              {request.metadata.consolidation_reasoning && (
-                <p className="text-sm text-nha-gray-500 mb-4 italic">
-                  {request.metadata.consolidation_reasoning}
-                </p>
-              )}
-              <div className="space-y-3">
-                {request.metadata.source_messages.map((msg, i) => (
-                  <div
-                    key={msg.id || i}
-                    className="bg-nha-gray-50 rounded-lg border border-nha-gray-100 p-3"
-                  >
-                    <div className="flex items-center gap-2 text-xs text-nha-gray-500 mb-1.5">
-                      <span className="font-medium text-nha-gray-700">{msg.author}</span>
-                      <span className="text-nha-gray-300">·</span>
-                      <span className="capitalize">{msg.source}</span>
-                      <span className="text-nha-gray-300">·</span>
-                      <span>{msg.date}</span>
-                      {msg.has_attachment && (
-                        <>
-                          <span className="text-nha-gray-300">·</span>
-                          <Paperclip size={10} />
-                        </>
-                      )}
-                    </div>
-                    <p className="text-sm text-nha-gray-700 whitespace-pre-wrap">
-                      {msg.original_text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Sources — extracted */}
+          <SourceMessages metadata={request.metadata} source={request.source} />
 
           {/* Decision */}
           {!isViewer && request.status !== 'completed' ? (
@@ -1147,18 +553,8 @@ export default function RequestDetail() {
             </div>
           ) : null}
 
-          {/* Admin: Delete request */}
-          {isAdmin && (
-            <div className="pt-4 border-t border-nha-gray-200">
-              <button
-                onClick={() => { setDeleteReason(''); setDeleteError(''); setShowDeleteModal(true) }}
-                className="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                <Trash2 size={14} />
-                Delete request
-              </button>
-            </div>
-          )}
+          {/* Admin: Delete request — extracted */}
+          <DeleteRequestButton request={request} />
         </div>
 
         {/* Sidebar */}
@@ -1222,147 +618,6 @@ export default function RequestDetail() {
           </div>
         </div>
       </div>
-
-      {/* Dismiss duplicate flag modal */}
-      {showDismissModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-          onClick={() => !dismissing && setShowDismissModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start gap-3 mb-4">
-              <div className="shrink-0 w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                <Copy size={18} className="text-orange-600" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-nha-gray-900">Dismiss possible-duplicate flag?</h3>
-                <p className="text-sm text-nha-gray-600 mt-1">
-                  The flag will be cleared so this request can move forward normally. The original match details stay on the card for reference.
-                </p>
-              </div>
-            </div>
-            <label className="block text-xs font-medium text-nha-gray-600 mb-1">
-              Reason (optional)
-            </label>
-            <textarea
-              value={dismissReason}
-              onChange={(e) => setDismissReason(e.target.value)}
-              placeholder="e.g. Different bug, the matched task is about X but this is about Y"
-              rows={2}
-              className="w-full text-sm border border-nha-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 resize-none"
-              disabled={dismissing}
-            />
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setShowDismissModal(false)}
-                disabled={dismissing}
-                className="px-4 py-2 text-sm font-medium text-nha-gray-700 hover:bg-nha-gray-100 rounded-lg transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDismissDuplicate}
-                disabled={dismissing}
-                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {dismissing ? 'Dismissing...' : 'Dismiss flag'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirmation modal */}
-      {showDeleteModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-          onClick={() => !deleting && setShowDeleteModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start gap-3 mb-4">
-              <div className="shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 size={18} className="text-red-600" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-nha-gray-900">Delete this request?</h3>
-                <p className="text-sm text-nha-gray-600 mt-1">
-                  "{request?.title}"
-                </p>
-              </div>
-            </div>
-
-            <p className="text-sm text-nha-gray-700 mb-3">
-              The request will be hidden from all views and won't be reprocessed by the consolidation engine.
-              {request?.metadata?.source_count && request.metadata.source_count > 1 ? (
-                <> All <strong>{request.metadata.source_count}</strong> underlying source messages will also be removed.</>
-              ) : null}
-              {' '}The original Slack/email message stays in its source system.
-            </p>
-
-            <label className="block text-xs font-medium text-nha-gray-600 mb-1">
-              Reason (optional)
-            </label>
-            <textarea
-              value={deleteReason}
-              onChange={(e) => setDeleteReason(e.target.value)}
-              placeholder="e.g. duplicate, junk, requester withdrew"
-              rows={2}
-              className="w-full text-sm border border-nha-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-300 resize-none"
-              disabled={deleting}
-            />
-
-            {deleteError && (
-              <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                {deleteError}
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deleting}
-                className="px-4 py-2 text-sm font-medium text-nha-gray-700 hover:bg-nha-gray-100 rounded-lg transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 inline-flex items-center gap-2"
-              >
-                {deleting ? 'Deleting...' : (<><Trash2 size={14} /> Delete</>)}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Lightbox modal */}
-      {lightboxUrl && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-8"
-          onClick={() => setLightboxUrl(null)}
-        >
-          <button
-            onClick={() => setLightboxUrl(null)}
-            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors"
-          >
-            <X size={28} />
-          </button>
-          <iframe
-            src={lightboxUrl}
-            className="max-w-full max-h-full w-full h-full rounded-lg bg-white"
-            title="Attachment preview"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
     </div>
   )
 }
