@@ -59,6 +59,7 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
   const [dhubTask, setDhubTask] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [showApproveBlockModal, setShowApproveBlockModal] = useState(false)
 
   // Whether the current form state matches what's saved
   const isNoneSelected = action === null
@@ -263,180 +264,205 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
   }
 
   return (
-    <div className="space-y-4">
-      <h3 className="font-semibold text-nha-gray-800">Status</h3>
+    <>
+      <div className="space-y-4">
+        <h3 className="font-semibold text-nha-gray-800">Status</h3>
 
-      <div className="flex flex-wrap gap-2">
-        {/* None / New button — always visible */}
-        <button
-          onClick={() => {
-            if (savedAction && action !== null) {
-              // User is switching to None — if there's a saved decision, clear it immediately
-              setAction(null)
-            } else {
-              setAction(null)
-            }
-          }}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all',
-            isNoneSelected
-              ? 'bg-nha-gray-100 border-nha-gray-400 ring-2 ring-nha-gray-200 text-nha-gray-700'
-              : 'border-nha-gray-200 hover:border-nha-gray-300 bg-white',
-          )}
-        >
-          <Circle size={16} className={isNoneSelected ? 'text-nha-gray-500' : 'text-nha-gray-400'} />
-          None
-        </button>
-
-        {ACTIONS.map((a) => {
-          const Icon = a.icon
-          const isActive = action === a.value
-          return (
-            <button
-              key={a.value}
-              onClick={() => setAction(a.value)}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all',
-                isActive
-                  ? cn(a.activeBg, 'ring-2')
-                  : 'border-nha-gray-200 hover:border-nha-gray-300 bg-white',
-              )}
-            >
-              <Icon size={16} className={isActive ? a.color : 'text-nha-gray-400'} />
-              {a.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {action === 'merge' && (
-        <div>
-          <label className="block text-sm font-medium text-nha-gray-700 mb-1">Merge into</label>
-          <select
-            value={mergeTargetId}
-            onChange={e => setMergeTargetId(e.target.value)}
-            className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+        <div className="flex flex-wrap gap-2">
+          {/* None / New button — always visible */}
+          <button
+            onClick={() => {
+              if (savedAction && action !== null) {
+                setAction(null)
+              } else {
+                setAction(null)
+              }
+            }}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all',
+              isNoneSelected
+                ? 'bg-nha-gray-100 border-nha-gray-400 ring-2 ring-nha-gray-200 text-nha-gray-700'
+                : 'border-nha-gray-200 hover:border-nha-gray-300 bg-white',
+            )}
           >
-            <option value="">Select a request to merge into...</option>
-            {mergeTargets.map(t => (
-              <option key={t.id} value={t.id}>
-                {t.title} — {t.requester_name}
-              </option>
-            ))}
-          </select>
-          {mergeTargets.length === 0 && (
-            <p className="text-xs text-nha-gray-400 mt-1">No other requests available to merge with</p>
-          )}
-        </div>
-      )}
+            <Circle size={16} className={isNoneSelected ? 'text-nha-gray-500' : 'text-nha-gray-400'} />
+            None
+          </button>
 
-      {action === 'approve' && (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-nha-gray-700 mb-1">Priority</label>
-            <div className="flex gap-2">
-              {PRIORITIES.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPriority(p)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-lg border text-sm capitalize transition-all',
-                    priority === p
-                      ? 'bg-nha-blue text-white border-nha-blue'
-                      : 'border-nha-gray-200 hover:border-nha-gray-300 bg-white',
-                  )}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-nha-gray-700 mb-1">Sprint</label>
-              <select
-                value={sprintId}
-                onChange={(e) => setSprintId(e.target.value)}
-                className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nha-sky focus:border-nha-sky"
+          {ACTIONS.map((a) => {
+            const Icon = a.icon
+            const isActive = action === a.value
+            return (
+              <button
+                key={a.value}
+                onClick={() => {
+                  if (a.value === 'approve' && user?.email !== 'cjaimes@nhaschools.com') {
+                    setShowApproveBlockModal(true)
+                    return
+                  }
+                  setAction(a.value)
+                }}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all',
+                  isActive
+                    ? cn(a.activeBg, 'ring-2')
+                    : 'border-nha-gray-200 hover:border-nha-gray-300 bg-white',
+                )}
               >
-                <option value="">Unassigned</option>
-                {sprints.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}{s.status === 'active' ? ' (active)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="w-32">
-              <label className="block text-sm font-medium text-nha-gray-700 mb-1">Estimate (hrs)</label>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                value={cenovioEstimate}
-                onChange={(e) => setCenovioEstimate(e.target.value)}
-                placeholder={aiEstimate != null ? String(aiEstimate) : '0'}
-                className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nha-sky focus:border-nha-sky"
-              />
-            </div>
-          </div>
-
+                <Icon size={16} className={isActive ? a.color : 'text-nha-gray-400'} />
+                {a.label}
+              </button>
+            )
+          })}
         </div>
-      )}
 
-      <label className="flex items-center gap-2.5 cursor-pointer group">
-        <input
-          type="checkbox"
-          checked={dhubTask}
-          onChange={(e) => setDhubTask(e.target.checked)}
-          className="w-4 h-4 rounded border-nha-gray-300 text-nha-blue focus:ring-nha-blue/20 cursor-pointer"
-        />
-        <span className="text-sm text-nha-gray-700 group-hover:text-nha-gray-900 transition-colors">
-          Decision Hub task
-        </span>
-        {!dhubTask && (
-          <span className="text-xs text-nha-gray-400">
-            — ClickUp task will be created without sprint tag or custom fields
-          </span>
+        {action === 'merge' && (
+          <div>
+            <label className="block text-sm font-medium text-nha-gray-700 mb-1">Merge into</label>
+            <select
+              value={mergeTargetId}
+              onChange={e => setMergeTargetId(e.target.value)}
+              className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+            >
+              <option value="">Select a request to merge into...</option>
+              {mergeTargets.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.title} — {t.requester_name}
+                </option>
+              ))}
+            </select>
+            {mergeTargets.length === 0 && (
+              <p className="text-xs text-nha-gray-400 mt-1">No other requests available to merge with</p>
+            )}
+          </div>
         )}
-      </label>
 
-      <div>
-        <label className="block text-sm font-medium text-nha-gray-700 mb-1">Notes</label>
-        <textarea
-          value={rationale}
-          onChange={(e) => setRationale(e.target.value)}
-          rows={3}
-          placeholder="Rationale or context..."
-          className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nha-sky focus:border-nha-sky resize-none"
-        />
+        {action === 'approve' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-nha-gray-700 mb-1">Priority</label>
+              <div className="flex gap-2">
+                {PRIORITIES.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPriority(p)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg border text-sm capitalize transition-all',
+                      priority === p
+                        ? 'bg-nha-blue text-white border-nha-blue'
+                        : 'border-nha-gray-200 hover:border-nha-gray-300 bg-white',
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-nha-gray-700 mb-1">Sprint</label>
+                <select
+                  value={sprintId}
+                  onChange={(e) => setSprintId(e.target.value)}
+                  className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nha-sky focus:border-nha-sky"
+                >
+                  <option value="">Unassigned</option>
+                  {sprints.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}{s.status === 'active' ? ' (active)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-32">
+                <label className="block text-sm font-medium text-nha-gray-700 mb-1">Estimate (hrs)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={cenovioEstimate}
+                  onChange={(e) => setCenovioEstimate(e.target.value)}
+                  placeholder={aiEstimate != null ? String(aiEstimate) : '0'}
+                  className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nha-sky focus:border-nha-sky"
+                />
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        <label className="flex items-center gap-2.5 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={dhubTask}
+            onChange={(e) => setDhubTask(e.target.checked)}
+            className="w-4 h-4 rounded border-nha-gray-300 text-nha-blue focus:ring-nha-blue/20 cursor-pointer"
+          />
+          <span className="text-sm text-nha-gray-700 group-hover:text-nha-gray-900 transition-colors">
+            Decision Hub task
+          </span>
+          {!dhubTask && (
+            <span className="text-xs text-nha-gray-400">
+              — ClickUp task will be created without sprint tag or custom fields
+            </span>
+          )}
+        </label>
+
+        <div>
+          <label className="block text-sm font-medium text-nha-gray-700 mb-1">Notes</label>
+          <textarea
+            value={rationale}
+            onChange={(e) => setRationale(e.target.value)}
+            rows={3}
+            placeholder="Rationale or context..."
+            className="w-full rounded-lg border border-nha-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nha-sky focus:border-nha-sky resize-none"
+          />
+        </div>
+
+        {error && (
+          <p className="text-sm text-red-600">{error}</p>
+        )}
+
+        {/* Show submit when changing to a new action, or clear when going back to None */}
+        {hasUnsavedChange && (
+          isNoneSelected && savedAction ? (
+            <button
+              onClick={handleClearDecision}
+              disabled={submitting}
+              className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all bg-nha-gray-600 text-white hover:bg-nha-gray-700"
+            >
+              {submitting ? 'Clearing...' : 'Clear Decision'}
+            </button>
+          ) : action ? (
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all bg-nha-blue text-white hover:bg-nha-blue/90"
+            >
+              {submitting ? 'Submitting...' : savedAction ? 'Update Decision' : 'Submit'}
+            </button>
+          ) : null
+        )}
       </div>
 
-      {error && (
-        <p className="text-sm text-red-600">{error}</p>
+      {/* Approve gatekeeper modal — shown to non-Cenovio admins */}
+      {showApproveBlockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl border border-nha-gray-200 p-6 max-w-sm mx-4 shadow-xl">
+            <h3 className="font-semibold text-nha-gray-900 mb-2">Approval restricted</h3>
+            <p className="text-sm text-nha-gray-600 mb-5">
+              Tasks can only be sent to ClickUp from the Decision Hub by Cenovio Jaimes.
+            </p>
+            <button
+              onClick={() => setShowApproveBlockModal(false)}
+              className="w-full py-2 rounded-lg text-sm font-semibold bg-nha-blue text-white hover:bg-nha-blue/90 transition-colors"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
       )}
-
-      {/* Show submit when changing to a new action, or clear when going back to None */}
-      {hasUnsavedChange && (
-        isNoneSelected && savedAction ? (
-          <button
-            onClick={handleClearDecision}
-            disabled={submitting}
-            className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all bg-nha-gray-600 text-white hover:bg-nha-gray-700"
-          >
-            {submitting ? 'Clearing...' : 'Clear Decision'}
-          </button>
-        ) : action ? (
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all bg-nha-blue text-white hover:bg-nha-blue/90"
-          >
-            {submitting ? 'Submitting...' : savedAction ? 'Update Decision' : 'Submit'}
-          </button>
-        ) : null
-      )}
-    </div>
+    </>
   )
 }
