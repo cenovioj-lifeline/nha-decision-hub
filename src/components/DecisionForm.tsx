@@ -40,6 +40,8 @@ const ACTIONS: { value: Action; label: string; icon: typeof Check; color: string
 
 const PRIORITIES = ['urgent', 'high', 'normal', 'low']
 
+const APPROVE_AUTHORIZED = ['cjaimes@nhaschools.com', 'kbraun@nhaschools.com']
+
 export default function DecisionForm({ requestId, currentStatus: _status, existingDecision, aiEstimate, onDecided }: DecisionFormProps) {
   const { user } = useAuth()
 
@@ -296,7 +298,7 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
               <button
                 key={a.value}
                 onClick={() => {
-                  if (a.value === 'approve' && user?.email !== 'cjaimes@nhaschools.com') {
+                  if (a.value === 'approve' && !APPROVE_AUTHORIZED.includes(user?.email ?? '')) {
                     setShowApproveBlockModal(true)
                     return
                   }
@@ -446,7 +448,7 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
         )}
       </div>
 
-      {/* Approve gatekeeper modal — shown to non-Cenovio admins */}
+      {/* Approve gatekeeper modal — shown to unauthorized admins */}
       {showApproveBlockModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-2xl border border-nha-gray-200 p-6 max-w-sm mx-4 shadow-xl">
