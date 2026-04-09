@@ -69,8 +69,8 @@ export default function Sprints() {
           if (!sprintId) continue
           const req = Array.isArray(d.requests) ? d.requests[0] : d.requests
           if (!req) continue
-          // Only show tasks whose request is still approved
-          if (req.status !== 'approved') continue
+          // Show tasks that are approved or sent to ClickUp (tracking)
+          if (req.status !== 'approved' && req.status !== 'tracking') continue
           if (!grouped[sprintId]) grouped[sprintId] = []
           grouped[sprintId].push({
             request_id: d.request_id,
