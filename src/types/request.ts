@@ -40,6 +40,7 @@ export interface DuplicateCheck {
   dismissed_at: string | null
   dismissed_by: string | null
   dismissed_reason: string | null
+  dismissed_usefulness: 'yes' | 'no' | 'partially' | null
   email_sent_at: string | null
   email_error: string | null
 }
