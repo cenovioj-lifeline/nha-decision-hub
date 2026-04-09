@@ -230,45 +230,45 @@ export default function Inbox() {
               Possible duplicates ({possibleDuplicateCount})
             </button>
           )}
-        </div>
-      )}
-      {requests.length > 0 && requesterNames.length > 1 && (
-        <div className="relative mb-4">
-          <button
-            onClick={() => setDropdownOpen(o => !o)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-nha-gray-200 text-sm text-nha-gray-700 hover:bg-nha-gray-50 transition-colors"
-          >
-            <span>
-              {isFiltered
-                ? `Submitted by: ${[...selectedRequesters].join(', ')}`
-                : 'All submitters'}
-            </span>
-            <ChevronDown size={14} className={`text-nha-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {dropdownOpen && (
-            <div className="absolute z-20 mt-1 w-72 bg-white rounded-lg border border-nha-gray-200 shadow-lg py-1">
+          {requesterNames.length > 1 && (
+            <div className="relative">
               <button
-                onClick={selectAll}
-                className="flex items-center justify-between w-full px-3 py-2 text-sm text-nha-gray-700 hover:bg-nha-gray-50"
+                onClick={() => setDropdownOpen(o => !o)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-nha-gray-200 text-sm text-nha-gray-700 hover:bg-nha-gray-50 transition-colors"
               >
-                <span>All submitters</span>
-                {!isFiltered && <Check size={14} className="text-nha-blue-600" />}
+                <span>
+                  {isFiltered
+                    ? `Submitted by: ${[...selectedRequesters].join(', ')}`
+                    : 'All submitters'}
+                </span>
+                <ChevronDown size={14} className={`text-nha-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-              <div className="border-t border-nha-gray-100 my-1" />
-              {requesterNames.map(name => {
-                const count = requests.filter(r => r.requester_name === name).length
-                const selected = selectedRequesters.has(name)
-                return (
+              {dropdownOpen && (
+                <div className="absolute z-20 mt-1 w-72 bg-white rounded-lg border border-nha-gray-200 shadow-lg py-1">
                   <button
-                    key={name}
-                    onClick={() => toggleRequester(name)}
+                    onClick={selectAll}
                     className="flex items-center justify-between w-full px-3 py-2 text-sm text-nha-gray-700 hover:bg-nha-gray-50"
                   >
-                    <span>{name} ({count})</span>
-                    {selected && <Check size={14} className="text-nha-blue-600" />}
+                    <span>All submitters</span>
+                    {!isFiltered && <Check size={14} className="text-nha-blue-600" />}
                   </button>
-                )
-              })}
+                  <div className="border-t border-nha-gray-100 my-1" />
+                  {requesterNames.map(name => {
+                    const count = requests.filter(r => r.requester_name === name).length
+                    const selected = selectedRequesters.has(name)
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => toggleRequester(name)}
+                        className="flex items-center justify-between w-full px-3 py-2 text-sm text-nha-gray-700 hover:bg-nha-gray-50"
+                      >
+                        <span>{name} ({count})</span>
+                        {selected && <Check size={14} className="text-nha-blue-600" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
