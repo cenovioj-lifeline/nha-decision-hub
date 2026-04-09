@@ -24,6 +24,7 @@ export default function DuplicateCheckSection({ request, onChange }: DuplicateCh
   const [dupActionMsg, setDupActionMsg] = useState('')
   const [showDismissModal, setShowDismissModal] = useState(false)
   const [dismissReason, setDismissReason] = useState('')
+  const [dismissUsefulness, setDismissUsefulness] = useState<'yes' | 'no' | 'partially' | ''>('')
   const [dismissing, setDismissing] = useState(false)
 
   const dup = request.metadata?.duplicate_check
@@ -66,7 +67,7 @@ export default function DuplicateCheckSection({ request, onChange }: DuplicateCh
   }
 
   async function handleDismissDuplicate() {
-    if (!request.id || !dup) return
+    if (!request.id || !dup || !dismissUsefulness) return
     setDismissing(true)
     try {
       const updatedDup = {
@@ -74,6 +75,7 @@ export default function DuplicateCheckSection({ request, onChange }: DuplicateCh
         dismissed_at: new Date().toISOString(),
         dismissed_by: user?.email ?? 'unknown',
         dismissed_reason: dismissReason.trim() || null,
+        dismissed_usefulness: dismissUsefulness,
       }
       const newMeta = {
         ...request.metadata,
@@ -85,9 +87,26 @@ export default function DuplicateCheckSection({ request, onChange }: DuplicateCh
         updated_at: new Date().toISOString(),
       }).eq('id', request.id)
       if (err) throw err
+
+      // Log feedback to duplicate_feedback table for each candidate
+      for (const c of candidates) {
+        await dhub.from('duplicate_feedback').insert({
+          request_id: request.id,
+          matched_task_id: c.clickup_task_id,
+          matched_task_title: c.title,
+          matched_task_status: c.status,
+          matched_task_url: c.clickup_task_url,
+          verdict: c.verdict,
+          usefulness: dismissUsefulness,
+          training_notes: dismissReason.trim() || null,
+          dismissed_by: user?.email ?? 'unknown',
+        })
+      }
+
       setShowDismissModal(false)
       setDismissReason('')
-      setDupActionMsg('Flag dismissed')
+      setDismissUsefulness('')
+      setDupActionMsg('Flag dismissed — feedback logged')
       setTimeout(() => setDupActionMsg(''), 4000)
       onChange()
     } catch (err) {
@@ -125,7 +144,7 @@ export default function DuplicateCheckSection({ request, onChange }: DuplicateCh
               </button>
               {isActive && isAdmin && (
                 <button
-                  onClick={() => { setDismissReason(''); setShowDismissModal(true) }}
+                  onClick={() => { setDismissReason(''); setDismissUsefulness(''); setShowDismissModal(true) }}
                   className="inline-flex items-center gap-1 text-xs text-nha-gray-600 hover:text-nha-gray-800 px-2 py-1 rounded border border-nha-gray-200 hover:bg-nha-gray-50"
                 >
                   Dismiss flag
@@ -142,6 +161,15 @@ export default function DuplicateCheckSection({ request, onChange }: DuplicateCh
         {isDismissed && (
           <div className="mb-4 text-sm text-nha-gray-500 italic">
             Dismissed by {dup.dismissed_by} on {formatDateTime(dup.dismissed_at!)}
+            {dup.dismissed_usefulness && (
+              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full not-italic font-medium ${
+                dup.dismissed_usefulness === 'yes' ? 'bg-green-100 text-green-700'
+                  : dup.dismissed_usefulness === 'partially' ? 'bg-amber-100 text-amber-700'
+                  : 'bg-red-100 text-red-700'
+              }`}>
+                {dup.dismissed_usefulness === 'yes' ? 'Useful' : dup.dismissed_usefulness === 'partially' ? 'Partially useful' : 'Not useful'}
+              </span>
+            )}
             {dup.dismissed_reason && (
               <div className="mt-1 text-nha-gray-600 not-italic">"{dup.dismissed_reason}"</div>
             )}
@@ -215,14 +243,35 @@ export default function DuplicateCheckSection({ request, onChange }: DuplicateCh
                 </p>
               </div>
             </div>
+            <label className="block text-xs font-medium text-nha-gray-600 mb-2">
+              Was this flag useful?
+            </label>
+            <div className="flex gap-2 mb-4">
+              {(['no', 'partially', 'yes'] as const).map((val) => (
+                <button
+                  key={val}
+                  onClick={() => setDismissUsefulness(val)}
+                  disabled={dismissing}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                    dismissUsefulness === val
+                      ? val === 'yes' ? 'border-green-400 bg-green-50 text-green-700'
+                        : val === 'partially' ? 'border-amber-400 bg-amber-50 text-amber-700'
+                        : 'border-red-400 bg-red-50 text-red-700'
+                      : 'border-nha-gray-200 text-nha-gray-600 hover:bg-nha-gray-50'
+                  }`}
+                >
+                  {val === 'yes' ? 'Yes' : val === 'partially' ? 'Partially' : 'No'}
+                </button>
+              ))}
+            </div>
             <label className="block text-xs font-medium text-nha-gray-600 mb-1">
-              Reason (optional)
+              Training notes (optional)
             </label>
             <textarea
               value={dismissReason}
               onChange={(e) => setDismissReason(e.target.value)}
-              placeholder="e.g. Different bug, the matched task is about X but this is about Y"
-              rows={2}
+              placeholder="e.g. Already in PO Review so it's done. If still in dev, linking the requests would've been useful."
+              rows={3}
               className="w-full text-sm border border-nha-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 resize-none"
               disabled={dismissing}
             />
@@ -236,7 +285,7 @@ export default function DuplicateCheckSection({ request, onChange }: DuplicateCh
               </button>
               <button
                 onClick={handleDismissDuplicate}
-                disabled={dismissing}
+                disabled={dismissing || !dismissUsefulness}
                 className="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors disabled:opacity-50"
               >
                 {dismissing ? 'Dismissing...' : 'Dismiss flag'}
