@@ -11,6 +11,7 @@ import Sprints from './pages/Sprints'
 import Dashboard from './pages/Dashboard'
 import Tracking from './pages/Tracking'
 import Guide from './pages/Guide'
+import HowItWorks from './pages/HowItWorks'
 import Admin from './pages/Admin'
 
 function RootRedirect() {
@@ -52,6 +53,7 @@ export default function App() {
             <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
             <Route path="/requests" element={<RequestsAndDecisions />} />
             <Route path="/guide" element={<Guide />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
             {/* Legacy redirects */}
             <Route path="/my-requests" element={<Navigate to="/requests" replace />} />
             <Route path="/decisions" element={<Navigate to="/requests" replace />} />

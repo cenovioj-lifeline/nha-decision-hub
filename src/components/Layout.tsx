@@ -14,6 +14,7 @@ import {
   Settings,
   BookOpen,
   Activity,
+  Info,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { cn } from '../lib/utils'
@@ -32,6 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
   { to: '/requests', label: 'Requests & Decisions', icon: FileText },
   { to: '/guide', label: 'Submission Guide', icon: BookOpen },
+  { to: '/how-it-works', label: 'How It Works', icon: Info },
   { to: '/admin', label: 'Admin', icon: Settings, adminOnly: true },
 ]
 
