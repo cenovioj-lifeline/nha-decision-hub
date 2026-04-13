@@ -65,7 +65,22 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
 
   // Whether the current form state matches what's saved
   const isNoneSelected = action === null
-  const hasUnsavedChange = action !== savedAction
+  const actionChanged = action !== savedAction
+
+  // Detect changes to fields within the same action (sprint, priority, estimate, rationale)
+  const savedRationale = existingDecision?.rationale ?? ''
+  const savedPriority = existingDecision?.priority ?? 'normal'
+  const savedSprintId = existingDecision?.sprint_id ?? ''
+  const savedEstimate = existingDecision?.cenovio_estimate != null ? String(existingDecision.cenovio_estimate) : ''
+
+  const fieldsChanged = action === savedAction && savedAction !== null && (
+    sprintId !== savedSprintId ||
+    priority !== savedPriority ||
+    cenovioEstimate !== savedEstimate ||
+    rationale !== savedRationale
+  )
+
+  const hasUnsavedChange = actionChanged || fieldsChanged
 
   useEffect(() => {
     async function fetchSprints() {
@@ -426,7 +441,7 @@ export default function DecisionForm({ requestId, currentStatus: _status, existi
           <p className="text-sm text-red-600">{error}</p>
         )}
 
-        {/* Show submit when changing to a new action, or clear when going back to None */}
+        {/* Show submit when changing to a new action, or fields changed, or clear when going back to None */}
         {hasUnsavedChange && (
           isNoneSelected && savedAction ? (
             <button
