@@ -15,6 +15,7 @@ import {
   BookOpen,
   Activity,
   Info,
+  ArrowLeft,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { cn } from '../lib/utils'
@@ -100,6 +101,15 @@ export default function Layout() {
             )
           })}
         </nav>
+
+        <a
+          href="https://nha-ai.com/apps"
+          className="flex items-center gap-2 px-5 py-3 border-t border-white/10 text-xs font-semibold text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+          aria-label="Back to all NHA AI apps"
+        >
+          <ArrowLeft size={14} />
+          NHA AI apps
+        </a>
 
         <div className="px-3 py-4 border-t border-white/10">
           {isViewer ? (

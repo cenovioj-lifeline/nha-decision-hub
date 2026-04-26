@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --color-nha-blue: #003B71;
+  --color-nha-blue: #183153;
+  --color-nha-blue-deep: #003B71;
   --color-nha-sky: #00A4E4;
   --color-nha-orange: #F37021;
   --color-nha-blue-light: #E8F0F8;
