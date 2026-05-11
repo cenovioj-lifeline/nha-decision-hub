@@ -1,6 +1,8 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/callback", "destination": "/api/auth/callback" },
+    { "source": "/no-access", "destination": "/no-access.html" },
+    { "source": "/((?!api/|callback$|no-access(?:\\.html)?$|assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

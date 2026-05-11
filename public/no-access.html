@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Access not granted — NHA Decision Hub</title>
+  <style>
+    :root {
+      --navy: #003865;
+      --maize: #ffcd00;
+      --ink: #1a2433;
+      --muted: #5a6573;
+      --paper: #f7f8fa;
+      --border: #e5e8ee;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      max-width: 560px;
+      width: 100%;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 40px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--navy);
+      background: #eef3fa;
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 1.75rem;
+      color: var(--navy);
+    }
+    p {
+      margin: 0 0 14px 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .email {
+      display: inline-block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 8px;
+      color: var(--ink);
+      font-size: 0.95rem;
+    }
+    .actions {
+      margin-top: 24px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    a.btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 18px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.15s ease;
+    }
+    a.primary {
+      background: var(--navy);
+      color: white;
+    }
+    a.primary:hover { background: #002a4a; }
+    a.secondary {
+      background: white;
+      color: var(--navy);
+      border: 1px solid var(--border);
+    }
+    a.secondary:hover { background: var(--paper); }
+    .why {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">NHA Decision Hub</span>
+    <h1>You don't have access yet</h1>
+    <p>Your NHA sign-in worked, but your account isn't on the Decision Hub access list.</p>
+    <p id="user-row" style="display:none">Signed in as: <span class="email" id="user-email"></span></p>
+    <div class="actions">
+      <a class="primary" href="mailto:cjaimes@nhaschools.com?subject=Decision Hub access request">Request access</a>
+      <a class="secondary" href="/api/auth/logout">Sign out</a>
+    </div>
+    <div class="why">
+      <p>Decision Hub is restricted to a small group (currently Cenovio, Kerry, Jessica, David). If you need access, email <a href="mailto:cjaimes@nhaschools.com">cjaimes@nhaschools.com</a>.</p>
+    </div>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const email = params.get('email');
+    if (email) {
+      document.getElementById('user-email').textContent = email;
+      document.getElementById('user-row').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
